@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build:win": "node scripts/patch-nsis-nodewine.js && electron-builder --win"
+    "build:win": "node scripts/patch-nsis-nodewine.js && bash scripts/download-binaries.sh && electron-builder --win"
   },
   "devDependencies": {
     "electron": "31.7.7",
