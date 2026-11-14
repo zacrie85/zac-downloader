@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('klip', {
+  // v1.6.1: path preload untuk webview (shim tombol MDM, bebas CSP halaman)
+  mdmPreloadPath: () => {
+    try { return ipcRenderer.sendSync('mdm:preload-path'); } catch (e) { return ''; }
+  },
   getInfo: () => ipcRenderer.invoke('app:getInfo'),
   engineVersion: () => ipcRenderer.invoke('engine:version'),
   downloadStart: (url, quality, opts) => ipcRenderer.invoke('download:start', url, quality, opts),
@@ -21,6 +25,8 @@ contextBridge.exposeInMainWorld('klip', {
   // v1.6.0: Mister Download Manager dibundel (bin/mdm) — status & buka
   mdmStatus: () => ipcRenderer.invoke('mdm:status'),
   mdmOpen: () => ipcRenderer.invoke('mdm:open'),
+  // v1.6.1: source shim+video.js MDM untuk di-inject ke tiap webview
+  mdmShim: () => ipcRenderer.invoke('mdm:shim'),
   onEvent: (cb) => {
     const h = (e, d) => { try { cb(d); } catch (err) { console.error('event handler', err); } };
     ipcRenderer.on('download:event', h);

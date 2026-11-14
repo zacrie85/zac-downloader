@@ -510,6 +510,8 @@ function createTab(url, activate = true) {
   const id = tabSeq;
   const wv = document.createElement('webview');
   wv.setAttribute('partition', 'persist:browser');
+  // v1.6.1: preload webview — jalur IPC shim MDM (bebas CSP halaman)
+  try { wv.setAttribute('preload', api.mdmPreloadPath()); } catch (e) {}
   // allowpopups: tanpa ini window.open/target=_blank dari webview tidak
   // memicu setWindowOpenHandler (popup nyata tetap DILARANG oleh handler
   // 'deny' di main — dialihkan menjadi tab baru).
@@ -593,6 +595,14 @@ function attachBrowserEvents(tab) {
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.url) onNav(tab, e.url, true); });
   wv.addEventListener('page-title-updated', (e) => {
     if (e.title) { tab.title = e.title; renderTabTitles(); }
+  });
+  // v1.6.1: inject shim + video.js MDM ke halaman → tombol "Download video"
+  // muncul di atas video, klik-nya langsung masuk ke MDM via jembatan lokal.
+  wv.addEventListener('dom-ready', async () => {
+    try {
+      const js = await api.mdmShim();
+      if (js) await wv.executeJavaScript(js, false);
+    } catch (e) {}
   });
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "zac-downloader",
   "productName": "Zac Downloader",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Zac Downloader - Download video dari YouTube, TikTok, Instagram, Facebook, Google Drive, BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort & ribuan situs lain. Dilengkapi browser built-in multi-tab + media capture + Mister Download Manager (MDM) dibundel. 100% lokal.",
   "main": "main.js",
   "author": "zacrie85",

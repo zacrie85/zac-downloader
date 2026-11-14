@@ -5,3 +5,4 @@ tmp/
 bin/*.exe
 bin/*.dll
 .DS_Store
+core

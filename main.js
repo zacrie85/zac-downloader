@@ -1,10 +1,12 @@
 /**
- * ZAC DOWNLOADER v1.6.0 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
- * Downloader video + browser built-in multi-tab + media capture + MDM dibundel.
+ * ZAC DOWNLOADER v1.6.1 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * Downloader video + browser built-in multi-tab + media capture + MDM dibundel
+ * (+ extension MDM aktif di dalam browser: tombol Download video & serap klik).
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const { spawn } = require('child_process');
 const { DownloadManager, MEDIA_EXTS } = require('./lib/downloader');
 const { createMediaTracker, isMediaContentType, shouldCapture } = require('./lib/mediacapture');
@@ -72,6 +74,366 @@ function resolveMdmExe() {
   return null;
 }
 
+// ---------- v1.6.1: Extension MDM di dalam browser built-in ----------
+// Extension Chromium resmi MDM (dibundel di bin/mdm/…/extension/chromium)
+// dimuat ke session 'persist:browser' → tombol "Download video" muncul di
+// halaman, klik link file/alternatif-klik diserap ke MDM, torrent & magnet
+// bisa langsung dari dalam browser, popup/opsi MDM tinggal satu klik.
+//
+// Electron TIDAK mendukung chrome.runtime.sendNativeMessage (native
+// messaging). Solusi: background.js extension dipatch saat startup —
+// fungsi native() mengirim pesan lewat HTTP POST ke jembatan lokal
+// (127.0.0.1, port acak) yang di-host main process ini. Jembatan
+// meneruskannya ke misterdownloadmanager-nmhost.exe memakai protokol
+// native messaging RESMI (framing 4-byte LE + JSON via stdin/stdout) —
+// persis seperti Chrome. nmhost otomatis menjalankan MDM bila belum jalan.
+let mdmExtId = null;        // id extension hasil loadExtension (untuk arg origin nmhost)
+let mdmNm = null;           // child process nmhost (di-reuse antar pesan)
+let mdmNmBuf = Buffer.alloc(0);
+let mdmNmWaiters = [];      // antrean {resolve, reject, timer} (native messaging = berurutan)
+let mdmBridgeSrv = null;
+let mdmBridgePort = 0;
+let mdmSession = null;      // session 'persist:browser' (untuk cookies video)
+let mdmShimJs = '';         // JS shim + video.js yang di-inject ke tiap webview
+const mdmHiddenSites = new Set(); // situs yang di-hide user (tombol video)
+
+function resolveMdmDir() {
+  const base = app.isPackaged
+    ? path.join(process.resourcesPath, 'bin', 'mdm')
+    : path.join(__dirname, 'bin', 'mdm');
+  try {
+    for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+      if (d.isDirectory() && d.name.startsWith('MisterDownloadManager')) return path.join(base, d.name);
+    }
+  } catch (e) {}
+  return null;
+}
+
+function mdmNmDrop(err) {
+  try { if (mdmNm) mdmNm.kill(); } catch (e) {}
+  mdmNm = null;
+  mdmNmBuf = Buffer.alloc(0);
+  const ws = mdmNmWaiters; mdmNmWaiters = [];
+  for (const w of ws) { clearTimeout(w.timer); w.reject(err || new Error('no answer')); }
+}
+
+function mdmNmEnsure() {
+  if (mdmNm) return mdmNm;
+  const dir = resolveMdmDir();
+  if (!dir) return null;
+  const exe = path.join(dir, 'misterdownloadmanager-nmhost.exe');
+  if (!fs.existsSync(exe)) return null;
+  // Chrome menjalankan native host dengan SATU argumen: origin pemanggil
+  const origin = mdmExtId
+    ? `chrome-extension://${mdmExtId}/`
+    : 'chrome-extension://ejoleppdfjgndddcjoehopknlglojp/';
+  try {
+    mdmNm = spawn(exe, [origin], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  } catch (e) { mdmNm = null; return null; }
+  mdmNm.on('error', () => mdmNmDrop());
+  mdmNm.on('close', () => mdmNmDrop());
+  mdmNm.stdout.on('data', (chunk) => {
+    mdmNmBuf = Buffer.concat([mdmNmBuf, chunk]);
+    // protokol native messaging: uint32 LE panjang + JSON, berurutan
+    while (mdmNmBuf.length >= 4) {
+      const len = mdmNmBuf.readUInt32LE(0);
+      if (mdmNmBuf.length < 4 + len) break;
+      const json = mdmNmBuf.slice(4, 4 + len).toString('utf8');
+      mdmNmBuf = mdmNmBuf.slice(4 + len);
+      let msg = {};
+      try { msg = JSON.parse(json); } catch (e) {}
+      const w = mdmNmWaiters.shift();
+      if (w) { clearTimeout(w.timer); w.resolve(msg); }
+    }
+  });
+  return mdmNm;
+}
+
+function mdmNativeRequest(msg) {
+  return new Promise((resolve, reject) => {
+    const p = mdmNmEnsure();
+    if (!p) return reject(new Error('no answer'));
+    const timer = setTimeout(() => mdmNmDrop(), 25000);
+    mdmNmWaiters.push({ resolve, reject, timer });
+    try {
+      const body = Buffer.from(JSON.stringify(msg), 'utf8');
+      const head = Buffer.alloc(4);
+      head.writeUInt32LE(body.length, 0);
+      p.stdin.write(Buffer.concat([head, body]));
+    } catch (e) { clearTimeout(timer); mdmNmDrop(e); }
+  });
+}
+
+// Cookies halaman dalam format header "a=b; c=d" (dari session browser)
+async function mdmCookieHeader(url) {
+  try {
+    const cookies = await mdmSession.cookies.get({ url });
+    return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  } catch (e) { return ''; }
+}
+
+function mdmBrands() {
+  return ['Chromium', 'Google Chrome'];
+}
+
+// ---- Pesan dari SHIM di halaman (video.js yang di-inject ke webview) ----
+// Video.js berjalan di world utama halaman (content script Electron tidak
+// meng-injek ke webview), jadi pesan "background"-nya diimplement di sini:
+// panel → izinkan tombol; video → native {video:true,…} + cookies session;
+// hide-site/options → diteruskan ke MDM.
+async function mdmPageMessage(msg, pageUrl) {
+  const page = isValidHttpUrl(pageUrl) ? pageUrl : '';
+  if (!msg || typeof msg !== 'object') return { ok: false };
+  if (msg.type === 'panel') {
+    if (!page) return { on: false };
+    const host = new URL(page).hostname;
+    return { on: !mdmHiddenSites.has(host) };
+  }
+  if (msg.type === 'video' && page) {
+    // video.js sudah menghitung URL video (videoPage) & src-nya. Src blob:
+    // (YouTube MSE) tidak bisa diambil dari halaman — URL halaman tetap
+    // dikirim; MDM memakai engine yt-dlp-nya sendiri untuk itu.
+    const named = /^https?:/i.test(msg.url || '') ? msg.url : page;
+    const src = /^https?:/i.test(msg.src || '') ? msg.src : '';
+    const cookies = await mdmCookieHeader(src || named);
+    const reply = await mdmNativeRequest({
+      video: true,
+      url: named,
+      ...(src ? { src } : {}),
+      title: typeof msg.title === 'string' ? msg.title.slice(0, 300) : '',
+      referrer: page !== named ? page : '',
+      cookies,
+      userAgent: app.userAgentFallback,
+      brands: mdmBrands(),
+      v: '0.5.2'
+    });
+    return { ok: Boolean(reply.ok), why: reply.why };
+  }
+  if (msg.type === 'hide-site' && page) {
+    mdmHiddenSites.add(new URL(page).hostname);
+    try { await mdmNativeRequest({ hideSite: new URL(page).hostname }); } catch (e) {}
+    return { ok: true };
+  }
+  if (msg.type === 'options') {
+    try {
+      const reply = await mdmNativeRequest({ openOptions: true });
+      return { ok: Boolean(reply.ok) };
+    } catch (e) { return { ok: false }; }
+  }
+  return { ok: false };
+}
+
+// Jembatan HTTP untuk background.js extension (yang sudah dipatch) dan
+// untuk shim di halaman (/page).
+function mdmBridgeStart() {
+  return new Promise((resolve) => {
+    mdmBridgeSrv = http.createServer((req, res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+      const isNative = req.method === 'POST' && req.url.startsWith('/native');
+      const isPage = req.method === 'POST' && req.url.startsWith('/page');
+      // Halaman uji tombol MDM (dipakai smoke test KLIP_TABTEST)
+      if (req.method === 'GET' && req.url === '/test.html') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<!DOCTYPE html><html><body style="margin:0"><video controls width="640" height="360" style="display:block"></video></body></html>');
+        return;
+      }
+      if (!isNative && !isPage) { res.writeHead(404); res.end(); return; }
+      let body = '';
+      req.on('data', (d) => { body += d; if (body.length > 2e6) req.destroy(); });
+      req.on('end', async () => {
+        let msg = null;
+        try { msg = JSON.parse(body); } catch (e) {}
+        if (!msg || typeof msg !== 'object') { res.writeHead(400); res.end(); return; }
+        if (SMOKE) console.log('[mdm-ext] bridge request:', (isPage ? 'page ' : '') + JSON.stringify(msg).slice(0, 140));
+        try {
+          let reply = {};
+          if (isPage) {
+            reply = await mdmPageMessage(msg.pageMsg, msg.pageUrl);
+          } else {
+            reply = await mdmNativeRequest(msg);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(reply || {}));
+        } catch (e) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, why: 'not-running' }));
+        }
+      });
+    });
+    mdmBridgeSrv.listen(0, '127.0.0.1', () => {
+      mdmBridgePort = mdmBridgeSrv.address().port;
+      resolve(mdmBridgePort);
+    });
+  });
+}
+
+// Salin extension ke userData (folder asli di resources tak boleh diubah),
+// patch background.js (sendNativeMessage → bridge), lalu muat.
+async function startMdmExtension(bSession) {
+  const dir = resolveMdmDir();
+  const extSrc = dir ? path.join(dir, 'extension', 'chromium') : null;
+  if (!extSrc || !fs.existsSync(path.join(extSrc, 'manifest.json'))) return;
+
+  await mdmBridgeStart();
+  const patched = path.join(app.getPath('userData'), 'mdm-extension');
+  try { fs.rmSync(patched, { recursive: true, force: true }); } catch (e) {}
+  try { fs.cpSync(extSrc, patched, { recursive: true }); } catch (e) { return; }
+
+  const bgPath = path.join(patched, 'background.js');
+  let bg = fs.readFileSync(bgPath, 'utf8');
+  const anchor = 'const HOST = "com.misterdownloadmanager.host";';
+  const call = 'const reply = (await withTimeout(ext.runtime.sendNativeMessage(HOST, sent), ms)) || {};';
+  if (!bg.includes(anchor) || !bg.includes(call)) return;
+  const bridgeCode = `
+// Zac Downloader: Electron tidak punya native messaging — pesan ke app
+// diteruskan lewat jembatan HTTP lokal yang di-host main process aplikasi.
+const BRIDGE_URL = "http://127.0.0.1:${mdmBridgePort}/native";
+async function bridgeSend(sent) {
+  let r;
+  try {
+    r = await fetch(BRIDGE_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sent) });
+  } catch (e) {
+    throw new Error("no answer");
+  }
+  if (!r.ok) throw new Error("no answer");
+  return (await r.json().catch(() => ({}))) || {};
+}`;
+  bg = bg.replace(anchor, anchor + '\n' + bridgeCode);
+  bg = bg.replace(call, 'const reply = (await withTimeout(bridgeSend(sent), ms)) || {};');
+  // Electron tidak punya chrome.contextMenus & chrome.action — beri guard
+  // supaya service worker tidak mati saat startup (API lain sudah ter-guard
+  // oleh extension itu sendiri: scripting, DNR, proxy, downloads).
+  bg = bg.replace(
+    'ext.contextMenus.onClicked.addListener(async (info, tab) => {',
+    'if (ext.contextMenus) ext.contextMenus.onClicked.addListener(async (info, tab) => {'
+  );
+  bg = bg.replace(
+    'ext.contextMenus.removeAll(() => {',
+    'if (!ext.contextMenus) return; ext.contextMenus.removeAll(() => {'
+  );
+  bg = bg.replace(
+    'const action = ext.action ?? ext.browserAction;',
+    'const action = (ext.action ?? ext.browserAction) || new Proxy({}, { get: () => () => {} });'
+  );
+  fs.writeFileSync(bgPath, bg, 'utf8');
+
+  // Penanda injeksi content script (pemecahan masalah & smoke test)
+  try {
+    const pg = fs.readFileSync(path.join(patched, 'page.js'), 'utf8');
+    fs.writeFileSync(path.join(patched, 'page.js'),
+      'try{console.log("[MDM-EXT] page.js aktif di", location.hostname)}catch(e){}\n' + pg, 'utf8');
+    const vd = fs.readFileSync(path.join(patched, 'video.js'), 'utf8');
+    fs.writeFileSync(path.join(patched, 'video.js'),
+      'try{console.log("[MDM-EXT] video.js aktif di", location.hostname)}catch(e){}\n' + vd, 'utf8');
+  } catch (e) {}
+
+  try {
+    const loaded = await bSession.loadExtension(patched, { allowFileAccess: false });
+    mdmExtId = loaded.id;
+    console.log('[mdm-ext] extension MDM dimuat:', loaded.name, loaded.version, 'id=' + loaded.id);
+  } catch (e) {
+    console.log('[mdm-ext] gagal memuat extension:', e.message);
+  }
+
+  // ---- Shim untuk video.js di dalam webview ----
+  // Content script Electron tidak meng-injek ke <webview>, jadi video.js
+  // (penanda tombol "Download video") di-inject manual lewat executeJavaScript
+  // oleh renderer. Shim menyediakan chrome.browser API minimal yang
+  // dibutuhkan video.js: runtime.sendMessage (→ bridge /page), i18n
+  // (locale id/en dari _locales), storage.local (localStorage).
+  mdmSession = bSession;
+  try {
+    const localesDir = path.join(extSrc, '_locales');
+    let loc = null;
+    for (const lang of ['id', 'en']) {
+      try { loc = JSON.parse(fs.readFileSync(path.join(localesDir, lang, 'messages.json'), 'utf8')); break; } catch (e) {}
+    }
+    const videoSrc = fs.readFileSync(path.join(extSrc, 'video.js'), 'utf8');
+    const shim = `
+(() => {
+  if (window.__mdmShimLoaded) return;
+  window.__mdmShimLoaded = true;
+  const BRIDGE = "http://127.0.0.1:${mdmBridgePort}/page";
+  const LOCALES = ${JSON.stringify(loc || {})};
+  const fill = (s, subs) => String(s == null ? "" : s).replace(/\\$(\\d)/g, (_, i) => (subs && subs[i - 1] != null ? String(subs[i - 1]) : ""));
+  const shim = {
+    runtime: {
+      id: "mdm-electron-shim",
+      sendMessage: (m) => {
+        // Utama: IPC dari preload webview (bebas CSP halaman). Cadangan: fetch
+        // ke jembatan HTTP lokal.
+        if (window.__mdmIpc && window.__mdmIpc.send) {
+          return window.__mdmIpc.send({ pageMsg: m, pageUrl: location.href }).catch(() => ({ ok: false }));
+        }
+        return fetch(BRIDGE, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageMsg: m, pageUrl: location.href }) }).then((r) => r.json()).catch(() => ({ ok: false }));
+      }
+    },
+    i18n: {
+      getMessage: (key, subs) => {
+        if (key === "@@bidi_dir") return "ltr";
+        const m = LOCALES[key];
+        if (!m) return "";
+        const text = typeof m === "string" ? m : (m.message || "");
+        return fill(text, subs);
+      }
+    },
+    storage: {
+      local: {
+        get: (defs) => {
+          const out = {};
+          try {
+            const keys = defs && typeof defs === "object" ? defs : {};
+            for (const k of Object.keys(keys)) {
+              const raw = localStorage.getItem("mdm." + k);
+              out[k] = raw == null ? keys[k] : JSON.parse(raw);
+            }
+            return Promise.resolve(out);
+          } catch (e) { return Promise.resolve(out); }
+        },
+        set: (o) => {
+          try { for (const [k, v] of Object.entries(o || {})) localStorage.setItem("mdm." + k, JSON.stringify(v)); } catch (e) {}
+          return Promise.resolve();
+        }
+      }
+    }
+  };
+  try { window.browser = shim; } catch (e) {}
+  try { if (!window.chrome) window.chrome = shim; } catch (e) {}
+  // Hybrid rAF: native rAF bila hidup, fallback timer bila di-throttle
+  // (window tersembunyi/occluded) — agar tombol MDM tetap bereaksi.
+  try {
+    const origRaf = window.requestAnimationFrame.bind(window);
+    const origCaf = window.cancelAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => {
+      let done = false, t = null, k = null;
+      const clear = () => { if (t != null) { clearTimeout(t); t = null; } if (k != null) { try { origCaf(k); k = null; } catch (e) {} } };
+      const finish = (v) => { if (done) return; done = true; clear(); try { cb(v); } catch (e) {} };
+      const cancel = () => { if (done) return; done = true; clear(); };
+      try { k = origRaf(finish); } catch (e) {}
+      t = setTimeout(() => finish(Date.now()), 32);
+      return { __mdmToken: true, cancel };
+    };
+    window.cancelAnimationFrame = (tok) => { try { if (tok && typeof tok.cancel === 'function') tok.cancel(); else origCaf(tok); } catch (e) {} };
+  } catch (e) {}
+})();`;
+    mdmShimJs = shim + '\ntry {\n' + videoSrc + '\n} catch (e) { console.log("[MDM-EXT] video.js error:", e && e.message); }';
+    console.log('[mdm-ext] shim tombol video siap (' + mdmShimJs.length + ' bytes)');
+  } catch (e) {
+    mdmShimJs = '';
+  }
+}
+
+async function startMdmIntegration(bSession) {
+  try { await startMdmExtension(bSession); } catch (e) {}
+}
+
+app.on('before-quit', () => {
+  try { if (mdmNm) mdmNm.kill(); } catch (e) {}
+  try { if (mdmBridgeSrv) mdmBridgeSrv.close(); } catch (e) {}
+});
+
 function resolveOutDir() {
   const candidates = [];
   try { candidates.push(app.getPath('videos')); } catch (e) {}
@@ -129,7 +491,7 @@ if (!gotLock) {
     if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
 
     settings = loadSettings();
@@ -153,6 +515,13 @@ if (!gotLock) {
       const ok = ['media', 'fullscreen', 'audioCapture', 'videoCapture', 'clipboard-sanitized-write'].includes(permission);
       cb(ok);
     });
+
+    // v1.6.1: extension MDM di browser built-in — tombol "Download video",
+    // klik link file → MDM, torrent/magnet, popup & opsi MDM. (Dipasang
+    // SEBELUM halaman pertama dibuat agar content script ikut sejak awal.)
+    if (process.env.KLIP_NO_MDMEXT !== '1') {
+      await startMdmIntegration(bSession);
+    }
 
     dm = new DownloadManager({
       ytdlpPath,
@@ -239,6 +608,9 @@ function createWindow() {
             const { webContents } = require('electron');
             const wvc = webContents.getAllWebContents().find((c) => c.getType() === 'webview');
             if (wvc) {
+              wvc.on('console-message', (e2, l2, m2) => {
+                if (/MDM-EXT/.test(String(m2))) console.log('[wv]', String(m2).slice(0, 140));
+              });
               await wvc.executeJavaScript("window.open('https://example.com/')", true);
               await new Promise((r) => setTimeout(r, 2500));
               const r2 = await win.webContents.executeJavaScript(`({
@@ -247,6 +619,37 @@ function createWindow() {
                 judul: [...document.querySelectorAll('.btab .bt-title')].map((x) => x.textContent)
               })`, true);
               console.log('TABTEST2 ' + JSON.stringify(r2));
+              // v1.6.1: end-to-end tombol "Download video" MDM — buka halaman
+              // uji berisi <video>, gerakkan pointer, tombol harus ter-mount
+              try {
+                const onMsg = (e2, l2, m2) => { const s2 = String(m2); if (!/Electron Security/.test(s2)) console.log('[wv]', s2.slice(0, 160)); };
+                wvc.on('console-message', onMsg);
+                await wvc.loadURL(`http://127.0.0.1:${mdmBridgePort}/test.html`);
+                await new Promise((r) => setTimeout(r, 3000));
+                // trigger hover via input event asli + fallback dispatch manual
+                try { wvc.sendInputEvent({ type: 'mouseMove', x: 320, y: 180 }); } catch (e) {}
+                await wvc.executeJavaScript(`(async () => {
+                  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+                  const rafOk = await new Promise((res) => {
+                    const t = setTimeout(() => res(false), 1500);
+                    requestAnimationFrame(() => { clearTimeout(t); res(true); });
+                  });
+                  for (let i = 0; i < 4; i++) {
+                    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 320, clientY: 180, bubbles: true, composed: true }));
+                    await sleep(350);
+                  }
+                  return { rafOk, at: (document.elementFromPoint(320, 180) || {}).tagName || null };
+                })()`, true).then((p) => console.log('MDMPROBE ' + JSON.stringify(p))).catch(() => {});
+                await new Promise((r) => setTimeout(r, 1200));
+                const r3 = await wvc.executeJavaScript(`({
+                  shim: Boolean(window.__mdmShimLoaded),
+                  ipc: Boolean(window.__mdmIpc),
+                  alive: Boolean(window.__mdmVideoButton && window.__mdmVideoButton.alive && window.__mdmVideoButton.alive()),
+                  btn: Boolean(document.querySelector('mdm-video-button'))
+                })`, true);
+                console.log('MDMBTN ' + JSON.stringify(r3));
+                wvc.off('console-message', onMsg);
+              } catch (e) { console.log('MDMBTN_FAIL ' + e.message); }
             } else {
               console.log('TABTEST2 webview tidak ditemukan');
             }
@@ -846,8 +1249,27 @@ function registerIpc() {
     return { ok: !!p, path: p };
   });
 
-  ipcMain.handle('mdm:open', () => {
-    const p = resolveMdmExe();
+  // v1.6.1: source shim+video.js untuk di-inject ke webview (tombol MDM)
+  ipcMain.handle('mdm:shim', () => mdmShimJs);
+
+  // v1.6.1: path preload webview — ditanya via sendSync (preload sandboxed
+  // tidak punya __dirname yang bisa diandalkan)
+  ipcMain.on('mdm:preload-path', (e) => {
+    e.returnValue = path.join(__dirname, 'renderer', 'mdm-preload.js');
+  });
+
+  // v1.6.1: pesan shim video.js dari preload webview (bebas CSP halaman)
+  ipcMain.handle('mdm:page-msg', async (e, payload) => {
+    try {
+      const msg = payload && typeof payload === 'object' ? payload : {};
+      if (SMOKE) console.log('[mdm-ext] page-msg:', JSON.stringify(msg.pageMsg || {}).slice(0, 140));
+      return await mdmPageMessage(msg.pageMsg, msg.pageUrl);
+    } catch (err) {
+      return { ok: false };
+    }
+  });
+
+  ipcMain.handle('mdm:open', () => {    const p = resolveMdmExe();
     if (!p) {
       return { error: 'Mister Download Manager tidak ditemukan di paket (bin/mdm). Gunakan paket Windows v1.6.0 yang sudah dibundel MDM.' };
     }

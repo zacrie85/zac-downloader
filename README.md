@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.0-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.1-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -14,6 +14,7 @@ Zac Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, T
 
 | Fitur | Keterangan |
 |---|---|
+| 🎯 **TOMBOL "DOWNLOAD VIDEO" MDM DI BROWSER** | **v1.6.1** — gerakkan kursor ke atas video di browser aplikasi → tombol **"Download video"** MDM muncul → klik → video masuk ke **Mister Download Manager** (cookies login & referer ikut dibawa). Menu tombol: unduh, buka di aplikasi, sembunyikan di situs ini, buka opsi MDM. UI tombol berbahasa Indonesia. |
 | 🗂 **BROWSER MULTI-TAB** | **v1.6.0** — browser built-in kini punya **tab bar**: tombol **＋** / **Ctrl+T** tab baru, **Ctrl+W** tutup tab, klik tengah pada tab untuk menutup. Link `target=_blank`, **Ctrl+klik** atau **klik tengah** pada link → otomatis **tab baru**. Klik kanan di halaman → menu *Buka link di tab baru*, *Salin alamat link*, Kembali/Maju/Muat ulang. |
 | ⚡ **MDM DIBUNDEL** | **v1.6.0** — **Mister Download Manager v0.5.2** (open-source GPL-3.0, Rust) ikut dipaketkan di folder `bin/mdm`. Klik **⚡ Buka MDM** di menu kiri → MDM terbuka di jendela terpisah untuk download file umum, **torrent & magnet link** (5× lebih cepat dari IDM menurut pengembangnya, tanpa iklan). |
 | 🎯 **MEDIA CAPTURE — SITUS DRAMA** | **v1.3.0** — buka episode di **FlickReels / Shortical / GoodShort** di browser aplikasi, tekan **Play** → video terdeteksi otomatis (chip hijau 🎯) → klik → download. Bekerja juga untuk situs apa pun yang video-nya dinamis! |
@@ -118,6 +119,13 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.1 — Tombol "Download video" MDM di dalam browser
+- **Extension resmi MDM kini aktif di browser built-in**: extension Chromium MDM v0.5.2 dimuat ke session browser, dan **video.js** (penanda tombol "Download video" MDM) di-inject ke setiap tab — gerakkan kursor ke atas video → tombol muncul → klik → download masuk ke **MDM** (video, torrent & magnet).
+- **Jembatan native messaging**: Electron tidak mendukung `chrome.runtime.sendNativeMessage`. Solusi: background extension dipatch saat startup — pesan diteruskan lewat **IPC bebas CSP** (fallback: HTTP lokal) ke main process, lalu main mengoper ke **misterdownloadmanager-nmhost.exe** memakai protokol native messaging resmi (framing 4-byte + JSON). nmhost **otomatis menjalankan MDM** bila belum jalan.
+- **Cookies & referer dibawa**: session browser aplikasi dikirim ke MDM bersama URL video (login/consent ikut) — perilaku sama seperti di Chrome.
+- Tombol tetap berfungsi walau window di-throttle (hybrid rAF), UI tombol memakai locale **Indonesia**, dan situs yang disembunyikan user dihormati.
+- Test: self-test end-to-end `KLIP_TABTEST` — tombol ter-mount di halaman uji (`MDMBTN {"btn":true}`), panel request terkirim, regresi multi-tab v1.6.0 tetap lulus.
 
 ### v1.6.0 (rilis perdana Zac Downloader — fork dari Klip Downloader v1.5.3)
 - **BROWSER MULTI-TAB**: browser built-in dilengkapi tab bar.
