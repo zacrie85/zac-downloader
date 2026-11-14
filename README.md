@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.5-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.6-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,10 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.6 — HOTFIX mirror: "Cannot access 'o' before initialization"
+- **v1.6.5 gagal start untuk SEMUA HP** dengan error `Cannot access 'o' before initialization` — kesalahan deklarasi (`o` dipakai sebelum dideklarasikan) di jalur mirror; v1.6.6 memperbaikinya.
+- **STARTTEST baru** (`scripts/test-start-real.js`): menjalankan `start()` mirror **sesungguhnya** dengan adb palsu + emulator server scrcpy (handshake 3 socket: video/audio/control) — memvalidasi seluruh argumen server (`audio=auto`, `stay_awake=false`, `cleanup=false`, `max_size`), jalur svc power, deteksi brand, audio disable (Android ≤10), dan fail-fast saat server HP mati. Kelas bug seperti v1.6.5 kini mustahil lolos tes.
 
 ### v1.6.5 — Mirror stabil di Xiaomi/MIUI & HP dengan ROM ketat
 - **FIX "server di HP gagal: DatabaseUtils.readExceptionFromParcel → RemoteException" saat Mulai Mirror di Xiaomi/Redmi/POCO**: server scrcpy saat start menyentuh **Settings.Global** (`stay_on_while_plugged_in`, jalur `cleanup`/`stay_awake`); MIUI memblokir akses provider ini dari shell → server mati sebelum layar mirror terbentuk. Kini aplikasi mengirim **`cleanup=false`** + **`stay_awake=false`** ke server dan fitur **"Layar HP tetap menyala"** dipindah ke **`svc power stayon`** (PowerManagerService — tanpa Settings provider, aman di semua ROM), dipulihkan otomatis saat mirror dihentikan.

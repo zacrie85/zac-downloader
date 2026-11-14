@@ -1,9 +1,9 @@
 /**
- * ZAC DOWNLOADER v1.6.5 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * ZAC DOWNLOADER v1.6.6 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
  * Downloader video + browser built-in multi-tab (session restore) + media
  * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
- * v1.6.5: mirror stabil di Xiaomi/MIUI — cleanup=false + stay-awake via svc
- * power (tanpa Settings provider), gagal cepat saat server HP mati.
+ * v1.6.6: HOTFIX mirror — TDZ "Cannot access 'o' before initialization" dari
+ * v1.6.5 + STARTTEST baru yang menjalankan start() sesungguhnya.
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
