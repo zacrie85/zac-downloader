@@ -25,11 +25,10 @@ Tutup aplikasi → buka lagi → **semua tab kembali persis** (alamat, judul, ta
 - Catatan jujur: di lingkungan uji headless (tanpa GPU), decoder software Chromium hanya membuktikan keyframe; P-frame tervalidasi tidak langsung (ffmpeg membuktikan stream valid). Di Windows dengan GPU biasa, path decode-nya berbeda. Bila mirror terasa aneh di kombinasi HP/PC tertentu, pakai tombol **[⧉ jendela scrcpy]** (klien scrcpy resmi, selalu stabil).
 
 ## 📦 Instalasi
-1. Unduh **Zac-Downloader-1.6.2-portable-win64.zip** (±372 MB) → extract → jalankan `Zac Downloader.exe` — tanpa install, bisa diletakkan di folder mana pun.
-2. SmartScreen: **More info → Run anyway**.
-3. Upgrade dari v1.6.x: pengaturan & data lama tetap terpakai (folder data `%APPDATA%\Zac Downloader` sama).
-
-> **Catatan**: untuk v1.6.2 **setup installer (.exe) belum tersedia** — gunakan portable zip di atas. Installer disiapkan menyusul di rilis berikutnya.
+1. **Installer**: unduh **Zac-Downloader-Setup-1.6.2.exe** (±254 MB) → jalankan → ikuti wizard (upgrade langsung di atas v1.6.x; shortcut desktop & Start Menu dibuat otomatis).
+2. **Portable** (tanpa install): unduh **Zac-Downloader-1.6.2-portable-win64.zip** (±372 MB) → extract → jalankan `Zac Downloader.exe` — bisa diletakkan di folder mana pun (mis. flashdisk).
+3. SmartScreen: **More info → Run anyway**.
+4. Upgrade dari v1.6.x: pengaturan & data lama tetap terpakai (folder data `%APPDATA%\Zac Downloader` sama).
 
 ## ⚖️ Lisensi & Kredit
 - Zac Downloader: MIT © 2026 zacrie85 — basis [Klip Downloader](https://github.com/zacrie85/klip-downloader)
