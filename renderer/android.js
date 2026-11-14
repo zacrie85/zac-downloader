@@ -473,8 +473,12 @@
       j.devices.forEach((d, i) => {
         const el = document.createElement('div');
         el.className = 'dev' + (i === 0 ? ' sel' : '');
+        // v1.6.4: badge state — device yang belum dikonfirmasi izinnya diberi tanda
+        const badge = d.state && d.state !== 'device'
+          ? '<span class="d-state">' + (d.state === 'unauthorized' ? '⚠️ Izinkan di HP' : '⚠️ ' + escapeHtml(d.state)) + '</span>'
+          : '';
         el.innerHTML = '<span>📱</span><span class="d-name">' + escapeHtml(d.model || d.serial) +
-          '</span><span class="d-serial">' + escapeHtml(d.serial) + '</span>';
+          '</span>' + badge + '<span class="d-serial">' + escapeHtml(d.serial) + '</span>';
         el.onclick = () => {
           document.querySelectorAll('.dev').forEach((x) => x.classList.remove('sel'));
           el.classList.add('sel');
@@ -515,6 +519,8 @@
       if (j.error) {
         pickerError('❌ ' + j.error);
       } else {
+        // v1.6.4: pesan audio-otomatis-dimatikan (HP Android ≤10)
+        if (j.note) log('ℹ️ ' + j.note);
         show($('picker'), false);
         startStreams();
       }

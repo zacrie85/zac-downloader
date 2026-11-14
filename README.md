@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.3-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.4-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,12 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.4 — Mirror Android stabil di HP lama (audio otomatis)
+- **FIX "device tidak merespons" saat Mulai Mirror di HP Android ≤10**: akar masalahnya opsi **Audio HP → PC** — capture audio scrcpy hanya didukung **Android 11+**; di Android 10 ke bawah (mis. Oukitel K15 Plus) server scrcpy mati saat init audio → socket video tak pernah dibuka → timeout, padahal USB debugging & izin sudah benar. Kini aplikasi memakai **`audio=auto`** (HP tak mendukung → server kirim kode disable, mirror jalan video saja) + **fallback otomatis tanpa audio** bila percobaan pertama gagal.
+- **Pesan error kini menjelaskan penyebab asli**: error dari server di HP (stderr) disertakan dalam pesan; sebelum mulai, state HP dicek per-serial — **unauthorized** → "tap Izinkan di HP", **offline** → "cabut-pasang kabel".
+- **Daftar device state-aware**: HP yang belum dikonfirmasi izinnya diberi badge ⚠️ **Izinkan di HP**; device offline juga terlihat.
+- Timeout koneksi video 15 → **25 detik** (HP lambat pun kejar).
 
 ### v1.6.3 — Tombol "Download video" MDM stabil di semua situs
 - **FIX tombol MDM hilang di situs ber-Trusted Types (YouTube, Google, dll.)**: penulisan HTML tombol lewat `shadow.innerHTML` diblokir kebijakan Trusted Types CSP (bahkan `DOMParser` ikut diblokir di YouTube) → script tombol mati total → tombol tidak pernah muncul. Kini struktur HTML tombol dibangun **eksplisit via `createElement`/`appendChild`** (builder DOM, 100% bebas sink Trusted Types) — tombol kini hidup juga di **www.youtube.com** (halaman home aplikasi), pelanggaran TrustedHTML 2 → **0**.
