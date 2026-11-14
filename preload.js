@@ -27,6 +27,14 @@ contextBridge.exposeInMainWorld('klip', {
   mdmOpen: () => ipcRenderer.invoke('mdm:open'),
   // v1.6.1: source shim+video.js MDM untuk di-inject ke tiap webview
   mdmShim: () => ipcRenderer.invoke('mdm:shim'),
+  // v1.6.2: session restore — simpan & pulihkan tab terakhir
+  sessionSave: (data) => ipcRenderer.invoke('session:save', data),
+  sessionSaveSync: (data) => {
+    try { return ipcRenderer.sendSync('session:save-sync', data); } catch (e) { return false; }
+  },
+  sessionLoad: () => ipcRenderer.invoke('session:load'),
+  // v1.6.2: mirror Android (scrcpy) — info server lokal untuk tab Android
+  mirrorInfo: () => ipcRenderer.invoke('mirror:info'),
   onEvent: (cb) => {
     const h = (e, d) => { try { cb(d); } catch (err) { console.error('event handler', err); } };
     ipcRenderer.on('download:event', h);

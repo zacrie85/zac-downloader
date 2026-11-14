@@ -1,0 +1,101 @@
+====================================================
+ ZAC DOWNLOADER v1.6.2 (mirror Android + session restore)
+ Petunjuk Pemakaian
+====================================================
+
+APA ITU ZAC DOWNLOADER?
+-----------------------
+Fork independen dari Klip Downloader v1.5.3 (MIT, © 2026 zacrie85)
+dengan tambahan fitur baru. Aplikasi ini BERDIRI SENDIRI — bisa
+dipasang berdampingan dengan Klip Downloader yang sudah ada tanpa
+saling menimpa:
+  - Folder instalasi : %LOCALAPPDATA%\Programs\Zac Downloader
+  - Shortcut         : "Zac Downloader" (desktop & Start Menu)
+  - Data/setting     : %APPDATA%\Zac Downloader
+  - Folder download  : Videos\Zac Downloader (bisa diganti)
+
+APA YANG BARU DI V1.6.2
+-----------------------
+1) TAB ANDROID 🤖 — JALANKAN APLIKASI HP DI PC, TANPA EMULATOR
+   - Tombol [🤖 Android] di menu kiri (sejajar "Buka MDM") →
+     membuka tab "Zac Mirror" di browser aplikasi.
+   - Sambungkan HP Android dengan kabel USB → aktifkan USB
+     DEBUGGING (Pengaturan → Opsi Pengembang → USB Debugging ON)
+     → saat popup "Izinkan debugging USB?" muncul di HP, pilih
+     IZINKAN → pilih device di tab → [▶ Mulai Mirror].
+   - Layar HP asli tampil di tab dan BISA DIKONTROL dari PC:
+     klik/sentuh = sentuhan HP, scroll = geser, ketik di keyboard
+     = mengetik di HP. Tombol toolbar: 🏠 Home, ↩ Back, ▤ Recents,
+     🔊/🔉 volume, ⏻ power, ⟳ putar layar, 🌙 matikan layar HP
+     (mirror tetap jalan), 🔈 mute suara, ⏹ Stop.
+   - Teknologi: scrcpy-server v5.0.1 resmi (Apache-2.0) dijalankan
+     di HP lewat adb yang DIBUNDEL — video H.264 di-decode langsung
+     di aplikasi (WebCodecs), audio Opus HP → PC. Semuanya lokal.
+   - UNTUK APA? Menjalankan aplikasi yang hanya ada di Android —
+     mis. SnackVideo — dengan LOGIN ASLI DI HP SENDIRI (OTP/SMS
+     masuk ke SIM-mu, 100% aman, bukan emulator = aman untuk
+     program hadiah). Bisa juga untuk WhatsApp Web-style kontrol
+     aplikasi apa pun.
+   - Tombol [⧉ Atau buka jendela scrcpy] di tab Android: membuka
+     jendela mirror terpisah bawaan scrcpy (audio langsung + bisa
+     merekam layar) — alternatif bila ingin pengalaman scrcpy utuh.
+   - Tips: kalau device tidak terdeteksi, cabut-pasang USB,
+     pastikan mode USB = "Transfer file", lalu [⟳ Pindai Ulang].
+
+2) SESSION RESTORE — TAB TERAKHIR KEMBALI SAAT APLIKASI DIBUKA
+   - Semua tab yang terbuka (alamat + judul + tab aktif) disimpan
+     otomatis. Tutup aplikasi → buka lagi → SEMUA TAB KEMBALI
+     PERSIS seperti sebelumnya (maksimal 15 tab).
+   - Termasuk tab 🤖 Android & halaman yang sedang login.
+
+FITUR LAMA YANG TETAP ADA
+-------------------------
+1) ENGINE yt-dlp + BROWSER MULTI-TAB
+   - Sumber Video: tempel URL → ⬇ Video / 🎵 MP3; kualitas,
+     download paralel 1-5, thumbnail; playlist → semua episode
+     otomatis (YouTube, BiliBili TV drama, Dramaharian).
+   - Browser multi-tab: [＋]/Ctrl+T tab baru, [✕]/Ctrl+W/klik
+     tengah tutup, target=_blank/Ctrl+klik → tab baru, klik kanan
+     → menu lengkap.
+   - Chip 🎯 Video terdeteksi (media capture) & chip 📺 Link siap
+     (Vidio/GoodShort — link stream disiapkan otomatis dari dalam
+     halaman; premium Vidio: login dulu di browser aplikasi).
+2) MISTER DOWNLOAD MANAGER (MDM) DIBUNDEL
+   - [⚡ Buka MDM] di menu kiri. File umum, torrent & magnet.
+   - Extension MDM aktif di browser aplikasi: gerakkan kursor ke
+     video → tombol "Download video" muncul → klik → masuk MDM
+     dengan cookies login halaman. Torrent/magnet langsung dari
+     browser. (v1.6.1)
+3) LAIN-LAIN
+   - Update engine yt-dlp dari aplikasi ([🛠 Update Engine]).
+   - 100% lokal: tanpa server, tanpa akun, tanpa telemetri.
+
+CARA INSTALL (SETUP.EXE)
+------------------------
+1) Jalankan Zac-Downloader-Setup-1.6.2.exe → ikuti wizard
+   (langsung upgrade di atas v1.6.0/v1.6.1).
+2) Windows SmartScreen: More info → Run anyway (aplikasi belum
+   ditandatangani secara digital — normal untuk aplikasi gratis).
+3) Tanpa install: Zac-Downloader-1.6.2-portable-win64.zip —
+   extract, jalankan "Zac Downloader.exe" di dalamnya.
+
+MIRROR ANDROID — SYARAT & PENYELESAIAN MASALAH
+----------------------------------------------
+- HP Android 5.0+ dengan USB debugging aktif (di atas).
+- Device tidak muncul? 1) coba kabel USB lain (harus data, bukan
+  charge-only), 2) cabut-pasang & izinkan popup, 3) pindai ulang.
+- Mirror lemot? Turunkan kualitas ke "Hemat — ≤ 720p".
+- Tidak ada suara? Sebagian HP lama tidak mendukung perekaman
+  audio internal → pakai [⧉ jendela scrcpy] atau mode Hemat.
+- Login SnackVideo: cukup login di HP seperti biasa — tab Android
+  hanya menampilkan & mengontrol layar HP-mu.
+
+LISENSI & KREDIT
+----------------
+- Zac Downloader: MIT © 2026 zacrie85 — basis Klip Downloader.
+- MDM + extension: GPL-3.0 © Ahmed Nefzaoui
+  (github.com/anefzaoui/misterdownloadmanager) — bila disebarluaskan,
+  source wajib ikut dibuka.
+- scrcpy-server / scrcpy.exe / adb: Apache-2.0 © Genymobile
+  (github.com/Genymobile/scrcpy) — protokol & jar resmi v5.0.1.
+- yt-dlp: Unlicense. FFmpeg: build GyanD (LGPL/GPL). node.exe: MIT.

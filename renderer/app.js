@@ -8,6 +8,7 @@ const el = {
   btnDownload: $('btnDownload'), btnMp3: $('btnMp3'),
   qualitySel: $('qualitySel'), thumbChk: $('thumbChk'), parallelSel: $('parallelSel'),
   btnEngineUpdate: $('btnEngineUpdate'), btnMdm: $('btnMdm'),
+  btnAndroid: $('btnAndroid'),
   folderInfo: $('folderInfo'), btnPickFolder: $('btnPickFolder'), btnOpenFolder: $('btnOpenFolder'),
   queueLine: $('queueLine'), activeList: $('activeList'), logBox: $('logBox'),
   btnRefresh: $('btnRefresh'), fileList: $('fileList'),
@@ -186,6 +187,11 @@ function updateQueueLine() {
     await api.setConcurrent(parseInt(el.parallelSel.value, 10) || 3);
   } catch (e) {}
   refreshList();
+  // smoke test: buka tab Android otomatis (KLIP_AUTO_ANDROID=1)
+  try {
+    const info2 = await api.getInfo();
+    if (info2 && info2.autoAndroid) createTab(ANDROID_URL, true);
+  } catch (e) {}
 })();
 
 api.onEvent(handleEvent);
@@ -494,6 +500,22 @@ let navTimer = null;
 const HOME_URL = 'https://www.youtube.com';
 const NEW_TAB_PAGE = (() => { try { return new URL('newtab.html', location.href).href; } catch (e) { return 'about:blank'; } })();
 
+// v1.6.2: tab Android (mirror scrcpy) — halaman lokal di dalam webview
+const ANDROID_URL = 'zac://android';
+let androidPageUrl = '';
+function androidTabUrl() {
+  if (androidPageUrl) return androidPageUrl;
+  try {
+    return new URL('android.html', location.href).href; // port diset lewat mirrorInfo
+  } catch (e) { return 'about:blank'; }
+}
+async function openAndroidTabIfNeeded() {
+  let port = 0;
+  try { const info = await api.mirrorInfo(); port = info.port || 0; } catch (e) {}
+  androidPageUrl = new URL('android.html?port=' + port, location.href).href;
+  return androidPageUrl;
+}
+
 function isNewTabUrl(u) { return !u || u === 'about:blank' || u === NEW_TAB_PAGE; }
 
 function hostnameOf(u) {
@@ -508,6 +530,7 @@ function curWb() {
 function createTab(url, activate = true) {
   tabSeq++;
   const id = tabSeq;
+  const isAndroid = url === ANDROID_URL;
   const wv = document.createElement('webview');
   wv.setAttribute('partition', 'persist:browser');
   // v1.6.1: preload webview — jalur IPC shim MDM (bebas CSP halaman)
@@ -516,11 +539,17 @@ function createTab(url, activate = true) {
   // memicu setWindowOpenHandler (popup nyata tetap DILARANG oleh handler
   // 'deny' di main — dialihkan menjadi tab baru).
   wv.setAttribute('allowpopups', 'true');
-  wv.setAttribute('src', url || NEW_TAB_PAGE);
+  if (isAndroid) {
+    // v1.6.2: tab Android — halaman mirror lokal (port server acak tiap run)
+    openAndroidTabIfNeeded().then((u) => { try { wv.setAttribute('src', u); } catch (e) {} });
+  } else {
+    wv.setAttribute('src', url || NEW_TAB_PAGE);
+  }
   el.webViews.appendChild(wv);
 
-  const tab = { id, wv, title: !isNewTabUrl(url) ? hostnameOf(url) : 'Tab Baru', url: url || NEW_TAB_PAGE };
+  const tab = { id, wv, title: isAndroid ? '🤖 Android' : (!isNewTabUrl(url) ? hostnameOf(url) : 'Tab Baru'), url: isAndroid ? ANDROID_URL : (url || NEW_TAB_PAGE) };
   tabs.push(tab);
+  queueSessionSave();
 
   const tabEl = document.createElement('div');
   tabEl.className = 'btab';
@@ -562,6 +591,7 @@ function activateTab(id) {
     if (getResolveSite(t.url)) scheduleSiteResolve(t.url, t.wv);
     else clearSiteState();
   }
+  queueSessionSave();
 }
 
 function closeTab(id) {
@@ -578,6 +608,7 @@ function closeTab(id) {
     if (next) activateTab(next.id);
     else createTab('', true); // jangan biarkan tanpa tab
   }
+  queueSessionSave();
 }
 
 function renderTabTitles() {
@@ -594,7 +625,7 @@ function attachBrowserEvents(tab) {
   wv.addEventListener('did-navigate', (e) => { if (e.url) onNav(tab, e.url, false); });
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.url) onNav(tab, e.url, true); });
   wv.addEventListener('page-title-updated', (e) => {
-    if (e.title) { tab.title = e.title; renderTabTitles(); }
+    if (e.title) { tab.title = e.title; renderTabTitles(); queueSessionSave(); }
   });
   // v1.6.1: inject shim + video.js MDM ke halaman → tombol "Download video"
   // muncul di atas video, klik-nya langsung masuk ke MDM via jembatan lokal.
@@ -607,9 +638,12 @@ function attachBrowserEvents(tab) {
 }
 
 function onNav(tab, url, inPage) {
+  // v1.6.2: halaman tab Android dilaporkan sebagai 'zac://android'
+  if (url && /android\.html/.test(url)) url = ANDROID_URL;
   tab.url = url;
   if (isNewTabUrl(url)) tab.title = 'Tab Baru';
   renderTabTitles();
+  queueSessionSave();
   if (tab.id !== activeTabId) return; // tab di background: jangan sentuh UI
   el.addrInput.value = isNewTabUrl(url) ? '' : url;
   clearTimeout(navTimer);
@@ -901,5 +935,53 @@ el.btnMdm.addEventListener('click', async () => {
   toast('⚡ Mister Download Manager terbuka di jendela terpisah 🚀', 'ok');
 });
 
-/* ---------------- tab pertama ---------------- */
-createTab(HOME_URL, true);
+/* ---------------- v1.6.2: tab Android (mirror HP via scrcpy, tanpa emulator) ---------------- */
+el.btnAndroid.addEventListener('click', () => {
+  const existing = tabs.find((t) => t.url === ANDROID_URL);
+  if (existing) { activateTab(existing.id); toast('🤖 Tab Android sudah terbuka', 'ok', 2200); return; }
+  createTab(ANDROID_URL, true);
+  toast('🤖 Tab Android dibuka — sambungkan HP-mu lewat USB', 'ok', 3200);
+});
+
+/* ---------------- v1.6.2: session restore (tab terakhir kembali saat app dibuka) ---------------- */
+let sessionTimer = null;
+function saveSessionNow(sync) {
+  const data = {
+    tabs: tabs.slice(0, 15).map((t) => ({
+      u: isNewTabUrl(t.url) ? '' : t.url,
+      t: (t.title || '').slice(0, 120),
+      a: t.id === activeTabId
+    }))
+  };
+  try { sync ? api.sessionSaveSync(data) : api.sessionSave(data); } catch (e) {}
+}
+function queueSessionSave() {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(() => saveSessionNow(false), 400);
+}
+window.addEventListener('beforeunload', () => saveSessionNow(true));
+
+async function restoreSession() {
+  let saved = null;
+  try { saved = await api.sessionLoad(); } catch (e) {}
+  const list = (saved && Array.isArray(saved.tabs))
+    ? saved.tabs.filter((x) => x && (x.u === ANDROID_URL || /^https?:\/\//i.test(x.u || '')))
+    : [];
+  if (!list.length) return false;
+  let activeIdx = 0;
+  for (let i = 0; i < list.length; i++) {
+    const e2 = list[i];
+    if (e2.a) activeIdx = i;
+    const tab = createTab(e2.u, false);
+    if (e2.t && e2.u !== ANDROID_URL) { tab.title = e2.t; }
+  }
+  renderTabTitles();
+  const at = tabs[Math.min(activeIdx, tabs.length - 1)];
+  if (at) activateTab(at.id);
+  return true;
+}
+
+/* ---------------- tab pertama (atau pulihkan tab terakhir) ---------------- */
+restoreSession().then((restored) => {
+  if (!restored) createTab(HOME_URL, true);
+});

@@ -1,7 +1,7 @@
 /**
- * ZAC DOWNLOADER v1.6.1 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
- * Downloader video + browser built-in multi-tab + media capture + MDM dibundel
- * (+ extension MDM aktif di dalam browser: tombol Download video & serap klik).
+ * ZAC DOWNLOADER v1.6.2 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * Downloader video + browser built-in multi-tab (session restore) + media
+ * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
@@ -10,6 +10,7 @@ const http = require('http');
 const { spawn } = require('child_process');
 const { DownloadManager, MEDIA_EXTS } = require('./lib/downloader');
 const { createMediaTracker, isMediaContentType, shouldCapture } = require('./lib/mediacapture');
+const { createMirrorServer } = require('./lib/mirror');
 
 // ---------- App flags ----------
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -17,6 +18,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36';
 
 const SMOKE = process.env.KLIP_SMOKE === '1';
+if (SMOKE) app.commandLine.appendSwitch('disable-gpu'); // stabil di Xvfb (WebCodecs tetap dekode via software)
 let win = null;
 let dm = null;
 let outDir = null;
@@ -24,6 +26,7 @@ let settings = {};
 let ytdlpPath = null;
 let ffmpegPath = null;
 let mediaTracker = null;
+let mirror = null; // v1.6.2: server mirror Android (scrcpy)
 
 // ---------- Settings (folder simpan tersimpan permanen) ----------
 function settingsPath() { return path.join(app.getPath('userData'), 'settings.json'); }
@@ -32,6 +35,30 @@ function loadSettings() {
 }
 function saveSettings() {
   try { fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2), 'utf8'); } catch (e) {}
+}
+
+// ---------- v1.6.2: session restore (tab terakhir dibuka lagi saat app dijalankan) ----------
+function sessionPath() { return path.join(app.getPath('userData'), 'session.json'); }
+let sessionSaveTimer = null;
+function writeSessionJson(data) {
+  try {
+    if (!data || !Array.isArray(data.tabs)) return;
+    const tmp = sessionPath() + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ ver: app.getVersion(), saved: Date.now(), tabs: data.tabs.slice(0, 15) }), 'utf8');
+    fs.renameSync(tmp, sessionPath());
+  } catch (e) {}
+}
+function saveSessionJson(data, immediate = false) {
+  if (immediate) { clearTimeout(sessionSaveTimer); sessionSaveTimer = null; writeSessionJson(data); return; }
+  clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(() => writeSessionJson(data), 300);
+}
+function loadSessionJson() {
+  try {
+    const j = JSON.parse(fs.readFileSync(sessionPath(), 'utf8'));
+    if (j && Array.isArray(j.tabs)) return { tabs: j.tabs };
+  } catch (e) {}
+  return { tabs: [] };
 }
 
 // ---------- Helpers ----------
@@ -536,9 +563,35 @@ if (!gotLock) {
     mediaTracker = createMediaTracker((evt) => send(evt));
     attachMediaCapture(bSession);
 
+    // v1.6.2: server mirror Android (scrcpy) — tab Android di browser built-in
+    if (process.env.KLIP_NO_MIRROR !== '1') {
+      try {
+        mirror = createMirrorServer({
+          resolveAdb: () => process.env.KLIP_ADB || resolveBin(path.join('scrcpy', 'adb.exe'), path.join('scrcpy', 'adb'), 'adb'),
+          resolveScrcpyBin: (...names) => resolveBin(...names),
+          serverJar: resolveBin(path.join('scrcpy', 'scrcpy-server')),
+          isSmoke: SMOKE,
+          onLog: (l) => console.log(l)
+        });
+        await mirror.start();
+        if (process.env.KLIP_FAKE_MIRROR === '1') {
+          // smoke test: simulasi device scrcpy (stream H.264/Opus sintetis)
+          setTimeout(() => { try { mirror.startFakeSession(); } catch (e) {} }, 1200);
+        }
+      } catch (e) {
+        console.log('[mirror] gagal start:', e.message);
+      }
+    }
+
     createWindow();
     registerIpc();
     registerSiteResolveIpc();
+  });
+
+  app.on('before-quit', () => {
+    try { if (mdmNm) mdmNm.kill(); } catch (e) {}
+    try { if (mdmBridgeSrv) mdmBridgeSrv.close(); } catch (e) {}
+    try { if (mirror) mirror.stop(); } catch (e) {}
   });
 
   app.on('window-all-closed', () => {
@@ -658,10 +711,67 @@ function createWindow() {
           app.quit();
         }, 2500);
       } else {
-        setTimeout(() => {
-          console.log('SMOKE_OK');
-          app.quit();
-        }, 3000);
+        // v1.6.2: KLIP_SESSTEST — uji session restore dalam 2 fase:
+        //   fase 1: buka/navigasi/tutup tab → quit (session.json tersimpan)
+        //   fase 2: app dibuka lagi → tab harus kembali persis
+        const sess = process.env.KLIP_SESSTEST;
+        const holdMs = (parseInt(process.env.KLIP_SMOKE_HOLD, 10) || 0) * 1000;
+        if (sess === '1' || sess === '2') {
+          setTimeout(async () => {
+            try {
+              if (sess === '1') {
+                const r = await win.webContents.executeJavaScript(`(async () => {
+                  const $ = (id) => document.getElementById(id);
+                  const out = { tabsAwal: document.querySelectorAll('.btab').length };
+                  console.log('[sesstest] langkah 1: buka tab');
+                  $('btnNewTab').click();                       // tab 2 → example.org
+                  await new Promise((r) => setTimeout(r, 600));
+                  console.log('[sesstest] langkah 2: navigasi example.org');
+                  $('addrInput').value = 'https://example.org/';
+                  $('btnGo').click();
+                  await new Promise((r) => setTimeout(r, 2500));
+                  console.log('[sesstest] langkah 3: buka tab 3');
+                  $('btnNewTab').click();                       // tab 3 → example.com
+                  await new Promise((r) => setTimeout(r, 600));
+                  console.log('[sesstest] langkah 4: navigasi example.com');
+                  $('addrInput').value = 'https://example.com/';
+                  $('btnGo').click();
+                  await new Promise((r) => setTimeout(r, 2500));
+                  console.log('[sesstest] langkah 5: tutup tab 2');
+                  const close2 = document.querySelectorAll('.btab')[1];
+                  if (close2) close2.querySelector('.bt-close').click(); // tutup example.org
+                  await new Promise((r) => setTimeout(r, 900));
+                  out.tabsAkhir = document.querySelectorAll('.btab').length;
+                  out.addr = $('addrInput').value;
+                  console.log('[sesstest] selesai');
+                  return out;
+                })()`, true);
+                console.log('SESSTEST1 ' + JSON.stringify(r));
+              } else {
+                const r = await win.webContents.executeJavaScript(`(() => ({
+                  tabs: document.querySelectorAll('.btab').length,
+                  addr: document.getElementById('addrInput').value,
+                  judul: [...document.querySelectorAll('.btab .bt-title')].map((x) => x.textContent),
+                  aktif: [...document.querySelectorAll('.btab')].findIndex((x) => x.classList.contains('active'))
+                }))()`, true);
+                console.log('SESSTEST2 ' + JSON.stringify(r));
+                console.log('SESSTEST2_PASS ' + (r.tabs === 2 && /example\.com/.test(r.addr) ? 'YA' : 'TIDAK'));
+              }
+            } catch (e) { console.log('SESSTEST_FAIL ' + e.message); }
+            console.log('SMOKE_OK');
+            app.quit();
+          }, sess === '1' ? 2500 : 5000);
+        } else if (holdMs > 0) {
+          setTimeout(() => {
+            console.log('SMOKE_OK');
+            app.quit();
+          }, holdMs);
+        } else {
+          setTimeout(() => {
+            console.log('SMOKE_OK');
+            app.quit();
+          }, 3000);
+        }
       }
     });
     if (process.env.KLIP_SHOT) {
@@ -727,6 +837,13 @@ app.on('web-contents-created', (ev, contents) => {
         send({ type: 'browser-fail', code, desc });
       }
     });
+    if (SMOKE) {
+      // smoke: relay log dari dalam webview (tab Android dll.) ke stdout
+      contents.on('console-message', (e2, l2, m2) => {
+        const s = String(m2);
+        if (!/Electron Security/.test(s)) console.log('[wv]', s.slice(0, 200));
+      });
+    }
     // v1.6.0: menu klik-kanan di dalam browser built-in
     contents.on('context-menu', (e, params) => showBrowserContextMenu(contents, params));
   }
@@ -1068,7 +1185,8 @@ function registerIpc() {
     outDir,
     platform: process.platform,
     ytdlpPath,
-    ffmpegPath
+    ffmpegPath,
+    autoAndroid: process.env.KLIP_AUTO_ANDROID === '1'
   }));
 
   ipcMain.handle('engine:version', async () => {
@@ -1288,6 +1406,17 @@ function registerIpc() {
       setTimeout(() => done({ ok: true }), 1500);
     });
   });
+
+  // ---------- v1.6.2: mirror Android (scrcpy) + session restore ----------
+  ipcMain.handle('mirror:info', () => {
+    return Object.assign({ port: mirror ? mirror.port : 0 }, mirror ? mirror.info() : { running: false });
+  });
+
+  ipcMain.handle('session:save', (e, data) => { saveSessionJson(data, false); return true; });
+
+  ipcMain.on('session:save-sync', (e, data) => { saveSessionJson(data, true); e.returnValue = true; });
+
+  ipcMain.handle('session:load', () => loadSessionJson());
 }
 
 process.on('uncaughtException', (err) => {

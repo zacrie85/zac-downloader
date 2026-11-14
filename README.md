@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.1-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.2-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -14,6 +14,8 @@ Zac Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, T
 
 | Fitur | Keterangan |
 |---|---|
+| 🤖 **TAB ANDROID — MIRROR & KENDALI HP** | **v1.6.2** — sambungkan HP Android via **USB** → layar HP tampil & bisa dikendalikan langsung di tab **🤖 Android** aplikasi (teknologi **scrcpy v5.0.1 resmi**, **tanpa emulator**). Cocok untuk SnackVideo dari HP aslimu: login & OTP tetap di HP, layar & suara tampil di PC. Ada tombol layar-mati 🌙 (HP bisa "istirahat" sambil mirror tetap jalan), navigasi Android, audio HP→PC, clipboard, dan opsi jendela scrcpy asli. |
+| 🔄 **SESSION RESTORE** | **v1.6.2** — semua tab (browser multi-tab dengan URL masing-masing, tab Android, sumber video, dll.) otomatis **dikembalikan persis** saat aplikasi dibuka lagi setelah ditutup — tidak ada tab yang hilang. |
 | 🎯 **TOMBOL "DOWNLOAD VIDEO" MDM DI BROWSER** | **v1.6.1** — gerakkan kursor ke atas video di browser aplikasi → tombol **"Download video"** MDM muncul → klik → video masuk ke **Mister Download Manager** (cookies login & referer ikut dibawa). Menu tombol: unduh, buka di aplikasi, sembunyikan di situs ini, buka opsi MDM. UI tombol berbahasa Indonesia. |
 | 🗂 **BROWSER MULTI-TAB** | **v1.6.0** — browser built-in kini punya **tab bar**: tombol **＋** / **Ctrl+T** tab baru, **Ctrl+W** tutup tab, klik tengah pada tab untuk menutup. Link `target=_blank`, **Ctrl+klik** atau **klik tengah** pada link → otomatis **tab baru**. Klik kanan di halaman → menu *Buka link di tab baru*, *Salin alamat link*, Kembali/Maju/Muat ulang. |
 | ⚡ **MDM DIBUNDEL** | **v1.6.0** — **Mister Download Manager v0.5.2** (open-source GPL-3.0, Rust) ikut dipaketkan di folder `bin/mdm`. Klik **⚡ Buka MDM** di menu kiri → MDM terbuka di jendela terpisah untuk download file umum, **torrent & magnet link** (5× lebih cepat dari IDM menurut pengembangnya, tanpa iklan). |
@@ -39,7 +41,7 @@ Zac Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, T
 
 ## 📦 Instalasi
 
-1. Unduh `Zac-Downloader-Setup-1.6.0.exe` dari [halaman Releases](../../releases).
+1. Unduh **installer** (`Zac-Downloader-Setup-*.exe`) atau **portable zip** (`Zac-Downloader-*-portable-win64.zip` — extract lalu jalankan `Zac Downloader.exe`) terbaru dari [halaman Releases](../../releases).
 2. Jika Windows SmartScreen muncul (karena aplikasi belum ditandatangani), klik **More info → Run anyway**.
 3. Ikuti wizard instalasi, selesai!
 
@@ -85,6 +87,12 @@ Tempel link playlist (`youtube.com/playlist?list=…`) atau channel (`youtube.co
 3. **Series (`vidio.com/premier/…`)** → seluruh episode otomatis masuk antrean paralel.
 4. **Live TV**: tonton dulu di browser aplikasi → bila yt-dlp gagal, tekan Play lalu pakai chip 🎯 "Video terdeteksi" di menu kiri.
 
+### 🤖 Tab Android (Mirror HP) — v1.6.2
+1. Sambungkan HP Android ke PC via **USB**. Di HP: buka **Setelan → Tentang telepon** → tap 7× **Nomor build** hingga muncul "Anda sekarang pengembang", lalu di **Setelan → Opsi pengembang** aktifkan **USB Debugging**.
+2. Di aplikasi, klik **🤖 Android** di menu kiri → **[▶ Mulai Mirror]** → centang **"Selalu izinkan dari komputer ini"** pada dialog *Izinkan debugging USB?* di HP → **Izinkan**.
+3. Layar HP tampil di tab — kendalikan dengan mouse (sentuh/geser) & keyboard (ketik). Tombol: **layar mati 🌙**, navigasi Android (◀ ▶ ⭕), **audio HP→PC**, clipboard, dan **buka jendela scrcpy asli**.
+4. Akhiri dengan tombol **■ Berhenti** sebelum mencabut kabel USB.
+
 ### 💡 Tips YouTube
 Bila YouTube menampilkan *"Sign in to confirm you're not a bot"* saat download: **login dulu ke YouTube lewat browser built-in** di aplikasi, lalu coba download lagi. Cookie login dipakai otomatis oleh engine dan tersimpan hanya di komputarmu.
 
@@ -119,6 +127,16 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.2 — Tab Android (Mirror HP) + Session Restore
+- **🤖 TAB ANDROID — MIRROR & KENDALI HP TANPA EMULATOR**: teknologi **scrcpy v5.0.1 resmi** diimplementasikan langsung di dalam aplikasi (server + protokol kontrol asli, decode video H.264 & audio Opus lewat WebCodecs):
+  - Sambungkan HP Android via **USB** → klik **🤖 Android** di menu kiri → **[▶ Mulai Mirror]** → layar HP tampil & dikendalikan langsung di tab aplikasi (server HTTP+WebSocket lokal di main process, renderer menggambar frame ke canvas).
+  - **Tanpa emulator** — SnackVideo & aplikasi lain berjalan di **HP aslimu**: login, OTP, dan device tetap asli.
+  - **Layar mati 🌙** — layar HP dimatikan sementara mirror & input tetap berjalan.
+  - **Audio HP → PC**, **clipboard** dua arah, tombol navigasi Android, dan opsi **jendela scrcpy asli** (`--window-*` lengkap).
+- **🔄 SESSION RESTORE**: posisi semua tab (browser multi-tab + URL per-tab, tab Android, URL sumber video, dst.) otomatis disimpan dan **dikembalikan persis** saat aplikasi dibuka lagi.
+- **Binari scrcpy dibundel & ter-track di repo** (`bin/scrcpy/`: scrcpy v5.0.1, adb, scrcpy-server, SDL3 + codec DLL).
+- Test: `SESSTEST` (restore 2 fase), `MIRRORTEST` (protokol scrcpy end-to-end: handshake → video frame → audio → 8 pesan kontrol), `TABTEST`/`MDMBTN` regresi v1.6.1 — semua lulus.
 
 ### v1.6.1 — Tombol "Download video" MDM di dalam browser
 - **Extension resmi MDM kini aktif di browser built-in**: extension Chromium MDM v0.5.2 dimuat ke session browser, dan **video.js** (penanda tombol "Download video" MDM) di-inject ke setiap tab — gerakkan kursor ke atas video → tombol muncul → klik → download masuk ke **MDM** (video, torrent & magnet).
