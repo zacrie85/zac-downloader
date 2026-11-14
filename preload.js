@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('klip', {
   resolveVidio: (payload) => ipcRenderer.invoke('vidio:resolve', payload),
   // v1.5.1: validasi & resolusi daftar episode GoodShort
   resolveGoodshort: (payload) => ipcRenderer.invoke('goodshort:resolve', payload),
+  // v1.6.0: Mister Download Manager dibundel (bin/mdm) — status & buka
+  mdmStatus: () => ipcRenderer.invoke('mdm:status'),
+  mdmOpen: () => ipcRenderer.invoke('mdm:open'),
   onEvent: (cb) => {
     const h = (e, d) => { try { cb(d); } catch (err) { console.error('event handler', err); } };
     ipcRenderer.on('download:event', h);

@@ -1,8 +1,8 @@
 {
-  "name": "klip-downloader",
-  "productName": "Klip Downloader",
-  "version": "1.5.3",
-  "description": "Klip Downloader - Download video dari YouTube, TikTok, Instagram, Facebook, Google Drive, BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort & ribuan situs lain. Dilengkapi browser built-in + media capture. 100% lokal.",
+  "name": "zac-downloader",
+  "productName": "Zac Downloader",
+  "version": "1.6.0",
+  "description": "Zac Downloader - Download video dari YouTube, TikTok, Instagram, Facebook, Google Drive, BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort & ribuan situs lain. Dilengkapi browser built-in multi-tab + media capture + Mister Download Manager (MDM) dibundel. 100% lokal.",
   "main": "main.js",
   "author": "zacrie85",
   "license": "MIT",
@@ -16,8 +16,8 @@
     "resedit": "^3.1.0"
   },
   "build": {
-    "appId": "io.github.zacrie85.klipdownloader",
-    "productName": "Klip Downloader",
+    "appId": "io.github.zacrie85.zacdownloader",
+    "productName": "Zac Downloader",
     "copyright": "Copyright © 2026 zacrie85",
     "directories": {
       "output": "dist",
@@ -50,7 +50,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Klip-Downloader-Setup-${version}.${ext}",
+      "artifactName": "Zac-Downloader-Setup-${version}.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -59,7 +59,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Klip Downloader",
+      "shortcutName": "Zac Downloader",
       "deleteAppDataOnUninstall": false
     },
     "compression": "maximum",

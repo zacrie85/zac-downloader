@@ -1,4 +1,4 @@
-/* ============ KLIP DOWNLOADER v1.5.1 — renderer logic (layout 30/70) ============ */
+/* ============ ZAC DOWNLOADER v1.6.0 — renderer logic (layout 30/70, browser multi-tab) ============ */
 const api = window.klip;
 const $ = (id) => document.getElementById(id);
 
@@ -7,13 +7,14 @@ const el = {
   urlInput: $('urlInput'), btnPaste: $('btnPaste'),
   btnDownload: $('btnDownload'), btnMp3: $('btnMp3'),
   qualitySel: $('qualitySel'), thumbChk: $('thumbChk'), parallelSel: $('parallelSel'),
-  btnEngineUpdate: $('btnEngineUpdate'),
+  btnEngineUpdate: $('btnEngineUpdate'), btnMdm: $('btnMdm'),
   folderInfo: $('folderInfo'), btnPickFolder: $('btnPickFolder'), btnOpenFolder: $('btnOpenFolder'),
   queueLine: $('queueLine'), activeList: $('activeList'), logBox: $('logBox'),
   btnRefresh: $('btnRefresh'), fileList: $('fileList'),
   btnBack: $('btnBack'), btnFwd: $('btnFwd'), btnReload: $('btnReload'), btnHome: $('btnHome'),
   addrInput: $('addrInput'), btnGo: $('btnGo'),
-  loadBar: $('loadBar'), browser: $('browser'),
+  loadBar: $('loadBar'),
+  tabs: $('tabs'), btnNewTab: $('btnNewTab'), webViews: $('webViews'),
   btnUseUrl: $('btnUseUrl'), detectChip: $('detectChip'),
   mediaChip: $('mediaChip'), mediaChipUrl: $('mediaChipUrl'), mediaCount: $('mediaCount'),
   siteChip: $('siteChip'), siteChipTitle: $('siteChipTitle'),
@@ -31,6 +32,7 @@ const mediaList = []; // [{url, referer, t}]
 // {pageUrl, entries:[{url,outName}], title, referer} — null bila belum ada
 let siteResolved = null;
 let siteResolveTimers = [];
+let siteWv = null; // v1.6.0: webview sumber resolusi (ikut sistem multi-tab)
 
 /* ---------------- util ---------------- */
 function toast(msg, kind = 'info', ms = 3400) {
@@ -368,7 +370,7 @@ function handleEvent(evt) {
       const vidio = /vidio\.com/.test(u);
       const gshort = /goodshort\.com/.test(u);
       toast(ppFail
-        ? '❌ Video terunduh tapi GAGAL SAAT MENGGABUNGKAN (ffmpeg). Aplikasi sudah mencoba ulang otomatis. Kalau tetap gagal: 1) pakai folder simpan sederhana (mis. Documents\\Klip), 2) tutup video yang sedang diputar di player, 3) coba kualitas 480P.'
+        ? '❌ Video terunduh tapi GAGAL SAAT MENGGABUNGKAN (ffmpeg). Aplikasi sudah mencoba ulang otomatis. Kalau tetap gagal: 1) pakai folder simpan sederhana (mis. Documents\\Zac), 2) tutup video yang sedang diputar di player, 3) coba kualitas 480P.'
         : vidio
           ? '❌ Vidio gagal diunduh. Solusi: buka dulu videonya di BROWSER aplikasi (link disiapkan otomatis ±7 detik) lalu klik tombol 📺. Konten premium → login vidio.com di browser ini dulu. Konten DRM tidak bisa diunduh.'
           : gshort
@@ -395,6 +397,14 @@ function handleEvent(evt) {
     }
     case 'browser-fail': {
       toast('Gagal memuat halaman (cek koneksi internet)', 'warn');
+      break;
+    }
+    case 'open-tab': {
+      // v1.6.0: link target=_blank / Ctrl+klik / klik-tengah / menu klik-kanan → tab baru
+      if (evt.url) {
+        createTab(evt.url, evt.activate !== false);
+        if (evt.activate !== false) toast('🌐 Dibuka di tab baru', 'ok', 2200);
+      }
       break;
     }
     case 'engine-update': {
@@ -475,35 +485,155 @@ function renderFiles(files) {
   }
 }
 
-/* ---------------- browser ---------------- */
-const wb = el.browser;
+/* ---------------- v1.6.0: browser multi-tab ---------------- */
+let tabs = [];            // {id, wv, tabEl, titleEl, title, url}
+let activeTabId = null;
+let tabSeq = 0;
+let navTimer = null;
 
-el.btnBack.addEventListener('click', () => { try { wb.goBack(); } catch (e) {} });
-el.btnFwd.addEventListener('click', () => { try { wb.goForward(); } catch (e) {} });
-el.btnReload.addEventListener('click', () => { try { wb.reload(); } catch (e) {} });
-el.btnHome.addEventListener('click', () => { try { wb.loadURL('https://www.youtube.com'); } catch (e) {} });
+const HOME_URL = 'https://www.youtube.com';
+const NEW_TAB_PAGE = (() => { try { return new URL('newtab.html', location.href).href; } catch (e) { return 'about:blank'; } })();
+
+function isNewTabUrl(u) { return !u || u === 'about:blank' || u === NEW_TAB_PAGE; }
+
+function hostnameOf(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u || 'Tab Baru'; }
+}
+
+function curWb() {
+  const t = tabs.find((x) => x.id === activeTabId);
+  return t ? t.wv : null;
+}
+
+function createTab(url, activate = true) {
+  tabSeq++;
+  const id = tabSeq;
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', 'persist:browser');
+  // allowpopups: tanpa ini window.open/target=_blank dari webview tidak
+  // memicu setWindowOpenHandler (popup nyata tetap DILARANG oleh handler
+  // 'deny' di main — dialihkan menjadi tab baru).
+  wv.setAttribute('allowpopups', 'true');
+  wv.setAttribute('src', url || NEW_TAB_PAGE);
+  el.webViews.appendChild(wv);
+
+  const tab = { id, wv, title: !isNewTabUrl(url) ? hostnameOf(url) : 'Tab Baru', url: url || NEW_TAB_PAGE };
+  tabs.push(tab);
+
+  const tabEl = document.createElement('div');
+  tabEl.className = 'btab';
+  tabEl.title = tab.title;
+  const titleEl = document.createElement('span');
+  titleEl.className = 'bt-title';
+  titleEl.textContent = tab.title;
+  const closeEl = document.createElement('button');
+  closeEl.className = 'bt-close';
+  closeEl.textContent = '✕';
+  closeEl.title = 'Tutup tab';
+  tabEl.appendChild(titleEl);
+  tabEl.appendChild(closeEl);
+  tabEl.addEventListener('click', (e) => { if (e.target === closeEl) return; activateTab(id); });
+  closeEl.addEventListener('click', (e) => { e.stopPropagation(); closeTab(id); });
+  // klik tengah pada tab = tutup tab
+  tabEl.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeTab(id); } });
+  el.tabs.appendChild(tabEl);
+  tab.tabEl = tabEl;
+  tab.titleEl = titleEl;
+
+  attachBrowserEvents(tab);
+  if (activate) activateTab(id);
+  else wv.style.display = 'none';
+  return tab;
+}
+
+function activateTab(id) {
+  activeTabId = id;
+  const t = tabs.find((x) => x.id === id);
+  for (const x of tabs) {
+    const on = x.id === id;
+    x.wv.style.display = on ? '' : 'none';
+    x.tabEl.classList.toggle('active', on);
+  }
+  if (t) {
+    el.addrInput.value = isNewTabUrl(t.url) ? '' : t.url;
+    // chip resolve (📺) mengikuti halaman tab yang aktif
+    if (getResolveSite(t.url)) scheduleSiteResolve(t.url, t.wv);
+    else clearSiteState();
+  }
+}
+
+function closeTab(id) {
+  const idx = tabs.findIndex((x) => x.id === id);
+  if (idx < 0) return;
+  const t = tabs[idx];
+  if (siteWv === t.wv) clearSiteState();
+  try { t.wv.stop(); } catch (e) {}
+  try { t.wv.remove(); } catch (e) {}
+  try { t.tabEl.remove(); } catch (e) {}
+  tabs.splice(idx, 1);
+  if (activeTabId === id) {
+    const next = tabs[Math.min(idx, tabs.length - 1)];
+    if (next) activateTab(next.id);
+    else createTab('', true); // jangan biarkan tanpa tab
+  }
+}
+
+function renderTabTitles() {
+  for (const t of tabs) {
+    t.titleEl.textContent = t.title || hostnameOf(t.url) || 'Tab Baru';
+    t.tabEl.title = t.title || t.url;
+  }
+}
+
+function attachBrowserEvents(tab) {
+  const wv = tab.wv;
+  wv.addEventListener('did-start-loading', () => { if (tab.id === activeTabId) el.loadBar.classList.add('on'); });
+  wv.addEventListener('did-stop-loading', () => { if (tab.id === activeTabId) el.loadBar.classList.remove('on'); });
+  wv.addEventListener('did-navigate', (e) => { if (e.url) onNav(tab, e.url, false); });
+  wv.addEventListener('did-navigate-in-page', (e) => { if (e.url) onNav(tab, e.url, true); });
+  wv.addEventListener('page-title-updated', (e) => {
+    if (e.title) { tab.title = e.title; renderTabTitles(); }
+  });
+}
+
+function onNav(tab, url, inPage) {
+  tab.url = url;
+  if (isNewTabUrl(url)) tab.title = 'Tab Baru';
+  renderTabTitles();
+  if (tab.id !== activeTabId) return; // tab di background: jangan sentuh UI
+  el.addrInput.value = isNewTabUrl(url) ? '' : url;
+  clearTimeout(navTimer);
+  navTimer = setTimeout(() => { if (tab.id === activeTabId) checkDetect(url); }, inPage ? 700 : 150);
+  // v1.5.1: halaman Vidio/GoodShort → siapkan link stream otomatis
+  if (getResolveSite(url)) scheduleSiteResolve(url, tab.wv);
+  else clearSiteState();
+}
+
+el.btnBack.addEventListener('click', () => { const w = curWb(); if (w) { try { w.goBack(); } catch (e) {} } });
+el.btnFwd.addEventListener('click', () => { const w = curWb(); if (w) { try { w.goForward(); } catch (e) {} } });
+el.btnReload.addEventListener('click', () => { const w = curWb(); if (w) { try { w.reload(); } catch (e) {} } });
+el.btnHome.addEventListener('click', () => { const w = curWb(); if (w) { try { w.loadURL(HOME_URL); } catch (e) {} } });
+
+el.btnNewTab.addEventListener('click', () => {
+  createTab('', true);
+  el.addrInput.focus();
+});
+
+// pintasan keyboard: Ctrl+T tab baru, Ctrl+W tutup tab
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  const k = (e.key || '').toLowerCase();
+  if (k === 't') { e.preventDefault(); createTab('', true); el.addrInput.focus(); }
+  else if (k === 'w') { e.preventDefault(); if (activeTabId != null) closeTab(activeTabId); }
+});
 
 function go() {
   const u = normalizeUrlOrSearch(el.addrInput.value);
-  if (u) { try { wb.loadURL(u); } catch (e) {} }
+  const w = curWb();
+  if (u && w) { try { w.loadURL(u); } catch (e) {} }
 }
 el.btnGo.addEventListener('click', go);
 el.addrInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-
-wb.addEventListener('did-start-loading', () => el.loadBar.classList.add('on'));
-wb.addEventListener('did-stop-loading', () => el.loadBar.classList.remove('on'));
-wb.addEventListener('did-navigate', (e) => { if (e.url) onNav(e.url); });
-wb.addEventListener('did-navigate-in-page', (e) => { if (e.url) onNav(e.url, true); });
-
-let navTimer = null;
-function onNav(url, inPage) {
-  el.addrInput.value = url;
-  clearTimeout(navTimer);
-  navTimer = setTimeout(() => checkDetect(url), inPage ? 700 : 150);
-  // v1.5.1: halaman Vidio/GoodShort → siapkan link stream otomatis
-  if (getResolveSite(url)) scheduleSiteResolve(url);
-  else clearSiteState();
-}
 
 function checkDetect(url) {
   if (!url || !isVideoUrl(url)) return;
@@ -651,38 +781,40 @@ function clearSiteState() {
   siteResolveTimers.forEach(clearTimeout);
   siteResolveTimers = [];
   siteResolved = null;
+  siteWv = null;
   el.siteChip.classList.add('hidden');
 }
 
-function scheduleSiteResolve(pageUrl) {
+function scheduleSiteResolve(pageUrl, wv) {
   clearSiteState();
+  siteWv = wv;
   // token/API situs biasanya siap segera setelah halaman terbuka — coba beberapa kali
   [1200, 3500, 7000].forEach((t) => {
-    siteResolveTimers.push(setTimeout(() => tryResolveSite(pageUrl), t));
+    siteResolveTimers.push(setTimeout(() => tryResolveSite(pageUrl, wv), t));
   });
 }
 
-async function tryResolveSite(pageUrl) {
+async function tryResolveSite(pageUrl, wv) {
   const site = getResolveSite(pageUrl);
-  if (!site) return;
+  if (!site || !wv) return;
   let wbUrl = '';
-  try { wbUrl = wb.getURL() || ''; } catch (e) {}
+  try { wbUrl = wv.getURL() || ''; } catch (e) {}
   if (!wbUrl || !samePageUrl(wbUrl, pageUrl)) return; // halaman sudah berganti
   if (siteResolved) return;                            // sudah berhasil sebelumnya
   const js = siteInjectJs(site.kind);
   if (!js) return;
   let res = null;
-  try { res = await wb.executeJavaScript(js, false); } catch (e) { return; }
+  try { res = await wv.executeJavaScript(js, false); } catch (e) { return; }
 
   // vidio: kandidat URL divalidasi satu per satu di main
   if (site.kind === 'vidio') {
     if (!res || !res.ok || !Array.isArray(res.candidates) || !res.candidates.length) return;
     let title = '';
-    try { title = wb.getTitle() || ''; } catch (e) {}
+    try { title = wv.getTitle() || ''; } catch (e) {}
     let r = null;
     try { r = await api.resolveVidio({ candidates: res.candidates, title }); } catch (e) { return; }
     let nowUrl = '';
-    try { nowUrl = wb.getURL() || ''; } catch (e) {}
+    try { nowUrl = wv.getURL() || ''; } catch (e) {}
     if (!samePageUrl(nowUrl, pageUrl)) return;
     if (r && r.ok && r.url) {
       siteResolved = { pageUrl, entries: [{ url: r.url, outName: r.outName || title }], title: r.outName || title, referer: site.referer };
@@ -696,11 +828,11 @@ async function tryResolveSite(pageUrl) {
   // goodshort: 1 atau banyak episode; entri pertama divalidasi di main
   if (!res || !res.ok || !Array.isArray(res.entries) || !res.entries.length) return;
   let title2 = res.title || '';
-  if (!title2) { try { title2 = (wb.getTitle() || '').replace(/\s*[|\u2013\u2014-]\s*GoodShort.*$/i, ''); } catch (e) {} }
+  if (!title2) { try { title2 = (wv.getTitle() || '').replace(/\s*[|\u2013\u2014-]\s*GoodShort.*$/i, ''); } catch (e) {} }
   let r2 = null;
   try { r2 = await api.resolveGoodshort({ entries: res.entries, title: title2 }); } catch (e) { return; }
   let nowUrl2 = '';
-  try { nowUrl2 = wb.getURL() || ''; } catch (e) {}
+  try { nowUrl2 = wv.getURL() || ''; } catch (e) {}
   if (!samePageUrl(nowUrl2, pageUrl)) return;
   if (r2 && r2.ok && Array.isArray(r2.entries) && r2.entries.length) {
     siteResolved = { pageUrl, entries: r2.entries, title: r2.outName || title2, referer: site.referer };
@@ -725,9 +857,10 @@ el.siteChip.addEventListener('click', async () => {
 });
 
 el.btnUseUrl.addEventListener('click', () => {
+  const w = curWb();
   let u = '';
-  try { u = wb.getURL() || ''; } catch (e) {}
-  if (!u || u === 'about:blank') { toast('Belum ada halaman yang terbuka', 'warn'); return; }
+  try { u = (w && w.getURL()) || ''; } catch (e) {}
+  if (!u || isNewTabUrl(u)) { toast('Belum ada halaman yang terbuka', 'warn'); return; }
   sendToSource(u, false);
 });
 
@@ -747,3 +880,16 @@ function sendToSource(url, auto) {
     : 'URL dikirim ke Sumber Video — klik Video/MP3 🚀', 'ok', 4200);
   el.btnDownload.focus();
 }
+
+/* ---------------- v1.6.0: MDM (Mister Download Manager) dibundel ---------------- */
+el.btnMdm.addEventListener('click', async () => {
+  const st = await api.mdmStatus().catch(() => ({ ok: false }));
+  if (!st || !st.ok) { toast('❌ MDM (Mister Download Manager) tidak ditemukan di paket ini.', 'err'); return; }
+  toast('⚡ Membuka Mister Download Manager…');
+  const r = await api.mdmOpen().catch((e) => ({ error: e && e.message }));
+  if (r && r.error) { toast('❌ ' + r.error, 'err', 6000); return; }
+  toast('⚡ Mister Download Manager terbuka di jendela terpisah 🚀', 'ok');
+});
+
+/* ---------------- tab pertama ---------------- */
+createTab(HOME_URL, true);

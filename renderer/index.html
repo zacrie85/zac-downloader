@@ -4,18 +4,18 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; font-src 'self'" />
-  <title>Klip Downloader</title>
+  <title>Zac Downloader</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="logo">🎬</span>
-      <div>
-        <h1>Klip Downloader</h1>
-        <span class="sub" id="verBadge">v1.4.0</span>
+      <div class="brand">
+        <span class="logo">🎬</span>
+        <div>
+          <h1>Zac Downloader</h1>
+          <span class="sub" id="verBadge">v1.6.0</span>
+        </div>
       </div>
-    </div>
     <div class="top-right">
       <span class="engine-badge" id="engineBadge" title="Versi engine yt-dlp">Engine: memuat…</span>
     </div>
@@ -104,12 +104,13 @@
         </div>
 
         <div class="side-foot">
+          <button id="btnMdm" class="btn ghost small" title="Buka Mister Download Manager (MDM) yang dibundel — download file umum, torrent &amp; magnet link">⚡ Buka MDM</button>
           <button id="btnEngineUpdate" class="btn ghost small" title="Update engine yt-dlp ke versi terbaru">🛠 Update Engine</button>
         </div>
       </section>
 
       <footer class="foot">
-        Klip Downloader v<span id="verFoot">1.5.1</span> — 100% lokal di komputarmu.
+        Zac Downloader v<span id="verFoot">1.6.0</span> — 100% lokal di komputarmu.
       </footer>
     </aside>
 
@@ -125,9 +126,15 @@
         <button id="btnGo" class="btn ghost">Muat</button>
       </div>
 
+      <!-- v1.6.0: tab bar browser multi-tab -->
+      <div class="tabbar">
+        <div class="tabs" id="tabs"></div>
+        <button id="btnNewTab" class="btn ghost icon tab-new" title="Tab baru (Ctrl+T)">＋</button>
+      </div>
+
       <div class="web-wrap">
         <div class="loadbar" id="loadBar"></div>
-        <webview id="browser" src="https://www.youtube.com" partition="persist:browser"></webview>
+        <div id="webViews" style="position:absolute;inset:0;"></div>
       </div>
 
       <div class="browser-actions">

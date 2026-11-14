@@ -1,10 +1,12 @@
-# 🎬 Klip Downloader
+# 🎬 Zac Downloader
 
-**Downloader video + browser built-in — 100% lokal, gratis, tanpa batas.**
+**Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.5.3-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
-Klip Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, TikTok, Instagram, Facebook, X/Twitter, Vimeo, Google Drive, Dailymotion, **BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort**, dan **1000+ situs lain** — dilengkapi **browser built-in** sehingga kamu bisa browsing, menonton, dan langsung mengunduh dalam satu aplikasi.
+> **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
+
+Zac Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, TikTok, Instagram, Facebook, X/Twitter, Vimeo, Google Drive, Dailymotion, **BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort**, dan **1000+ situs lain** — dilengkapi **browser built-in multi-tab** sehingga kamu bisa browsing, menonton, dan langsung mengunduh dalam satu aplikasi. Plus **Mister Download Manager (MDM) dibundel** untuk file umum, torrent & magnet link.
 
 ---
 
@@ -12,6 +14,8 @@ Klip Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, 
 
 | Fitur | Keterangan |
 |---|---|
+| 🗂 **BROWSER MULTI-TAB** | **v1.6.0** — browser built-in kini punya **tab bar**: tombol **＋** / **Ctrl+T** tab baru, **Ctrl+W** tutup tab, klik tengah pada tab untuk menutup. Link `target=_blank`, **Ctrl+klik** atau **klik tengah** pada link → otomatis **tab baru**. Klik kanan di halaman → menu *Buka link di tab baru*, *Salin alamat link*, Kembali/Maju/Muat ulang. |
+| ⚡ **MDM DIBUNDEL** | **v1.6.0** — **Mister Download Manager v0.5.2** (open-source GPL-3.0, Rust) ikut dipaketkan di folder `bin/mdm`. Klik **⚡ Buka MDM** di menu kiri → MDM terbuka di jendela terpisah untuk download file umum, **torrent & magnet link** (5× lebih cepat dari IDM menurut pengembangnya, tanpa iklan). |
 | 🎯 **MEDIA CAPTURE — SITUS DRAMA** | **v1.3.0** — buka episode di **FlickReels / Shortical / GoodShort** di browser aplikasi, tekan **Play** → video terdeteksi otomatis (chip hijau 🎯) → klik → download. Bekerja juga untuk situs apa pun yang video-nya dinamis! |
 | ✂️ **URL Episode Langsung** | **v1.3.0** — link episode FlickReels (dan kebanyakan situs) bisa langsung ditempel & diunduh tanpa buka browser. |
 | 📺 **BILIBILI TV (SHORT DRAMA)** | **v1.4.0** — tempel URL episode `bilibili.tv/id/play/{drama}/{ep}` atau URL dramanya `bilibili.tv/id/play/{drama}` → **seluruh episode otomatis masuk antrean paralel** (contoh: 1 drama = 72 episode). Juga mendukung `bilibili.tv/id/video/{id}`. Deteksi otomatis saat browsing di browser aplikasi. |
@@ -34,9 +38,11 @@ Klip Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, 
 
 ## 📦 Instalasi
 
-1. Unduh `Klip-Downloader-Setup-1.5.3.exe` dari [halaman Releases](../../releases).
+1. Unduh `Zac-Downloader-Setup-1.6.0.exe` dari [halaman Releases](../../releases).
 2. Jika Windows SmartScreen muncul (karena aplikasi belum ditandatangani), klik **More info → Run anyway**.
 3. Ikuti wizard instalasi, selesai!
+
+> **Coexist dengan Klip Downloader**: Zac Downloader dipasang ke `%LOCALAPPDATA%\Programs\Zac Downloader` dengan shortcut sendiri — aplikasi Klip Downloader yang sudah terpasang TIDAK tersentuh sama sekali.
 
 ## 🚀 Cara Pakai
 
@@ -109,7 +115,20 @@ Build Windows di Linux butuh: `NODE_OPTIONS="--require ./scripts/patch-macos-che
 
 MIT © 2026 [zacrie85](https://github.com/zacrie85)
 
+Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
+
 ## 🗒 Changelog
+
+### v1.6.0 (rilis perdana Zac Downloader — fork dari Klip Downloader v1.5.3)
+- **BROWSER MULTI-TAB**: browser built-in dilengkapi tab bar.
+  - Tab baru: tombol **＋** atau **Ctrl+T**; tutup tab: tombol ✕, **Ctrl+W**, atau klik tengah pada tab.
+  - Link `target=_blank`, **Ctrl+klik**, dan **klik tengah** pada link kini membuka **tab baru** di dalam aplikasi (dulu: halaman dimuat menimpa tab aktif).
+  - **Menu klik-kanan** di halaman: *Buka link di tab baru*, *Salin alamat link*, *Buka gambar di tab baru*, Kembali, Maju, Muat ulang.
+  - Halaman start tab baru (`newtab.html`) berisi petunjuk pintasan; address bar & deteksi video otomatis mengikuti tab aktif.
+- **MDM (Mister Download Manager) DIBUNDEL**: MDM portable **v0.5.2** ikut dipaketkan di `bin/mdm/` (SHA256 diverifikasi terhadap `SHA256SUMS.txt` resmi rilis v0.5.2).
+  - Tombol **⚡ Buka MDM** di menu kiri menjalankan MDM sebagai aplikasi terpisah (tetap hidup walau Zac Downloader ditutup).
+  - MDM menambah kemampuan download file umum + **torrent & magnet link** yang tidak ada di yt-dlp.
+- **REBRANDING INDEPENDEN**: appId `io.github.zacrie85.zacdownloader`, folder instalasi `Programs\Zac Downloader`, shortcut "Zac Downloader", folder data `%APPDATA%\Zac Downloader`, folder hasil download default `Videos\Zac Downloader` — semuanya terpisah dari Klip Downloader.
 
 ### v1.5.3
 - **FIX BiliBili TV — "ERROR: Postprocessing: Error opening output files: Invalid argument"** (video terunduh tapi gagal saat digabung):
