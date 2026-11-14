@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.2-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.3-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,12 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.3 — Tombol "Download video" MDM stabil di semua situs
+- **FIX tombol MDM hilang di situs ber-Trusted Types (YouTube, Google, dll.)**: penulisan HTML tombol lewat `shadow.innerHTML` diblokir kebijakan Trusted Types CSP (bahkan `DOMParser` ikut diblokir di YouTube) → script tombol mati total → tombol tidak pernah muncul. Kini struktur HTML tombol dibangun **eksplisit via `createElement`/`appendChild`** (builder DOM, 100% bebas sink Trusted Types) — tombol kini hidup juga di **www.youtube.com** (halaman home aplikasi), pelanggaran TrustedHTML 2 → **0**.
+- **Injeksi ulang otomatis**: tiap tab memverifikasi 2,5 detik setelah halaman siap — bila shim belum hidup, injeksi diulang. Injeksi idempotent (video.js early-return saat tombol masih alive), jadi aman dijalankan berulang.
+- Patch diterapkan di **dua jalur** sekaligus: shim video.js per-webview (browser built-in) dan extension MDM di session browser.
+- Test: `KLIP_TABTEST`/`TABTEST2`/`MDMBTN` lulus + **tanpa error TrustedHTML** di www.youtube.com.
 
 ### v1.6.2 — Tab Android (Mirror HP) + Session Restore
 - **🤖 TAB ANDROID — MIRROR & KENDALI HP TANPA EMULATOR**: teknologi **scrcpy v5.0.1 resmi** diimplementasikan langsung di dalam aplikasi (server + protokol kontrol asli, decode video H.264 & audio Opus lewat WebCodecs):

@@ -1,7 +1,9 @@
 /**
- * ZAC DOWNLOADER v1.6.2 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * ZAC DOWNLOADER v1.6.3 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
  * Downloader video + browser built-in multi-tab (session restore) + media
  * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
+ * v1.6.3: tombol "Download video" MDM tahan Trusted Types (YouTube/Google)
+ * + injeksi ulang otomatis bila shim belum hidup.
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
@@ -296,6 +298,42 @@ function mdmBridgeStart() {
   });
 }
 
+// ---------- v1.6.3: tombol video tahan Trusted Types ----------
+// Situs dengan Trusted Types CSP (YouTube, Google, dsb.) memblokir SEMUA jalur
+// injeksi HTML: shadow.innerHTML DAN DOMParser.parseFromString — keduanya
+// melempar "This document requires 'TrustedHTML' assignment" sehingga script
+// tombol mati total dan tombol "Download video" hilang. Solusi: bangun DOM
+// tombol secara eksplisit (createElement + appendChild) — 100% bebas sink
+// Trusted Types. mdmPatchVideoJs() mengganti statement innerHTML di video.js
+// dengan pemanggilan builder ini.
+const MDM_DOM_BUILDER = [
+  'try{globalThis.__mdmBuildShadowDOM=function(sh){try{',
+  'var E=function(tag,attrs){var n=document.createElement(tag);for(var k in attrs)n.setAttribute(k,attrs[k]);return n};',
+  'var SVG="http://www.w3.org/2000/svg";',
+  'var pill=E("div",{class:"pill",part:"pill"});',
+  'var go=E("button",{class:"go",type:"button"});',
+  'var img=document.createElement("img");img.setAttribute("alt","");img.setAttribute("draggable","false");',
+  'var label=E("span",{class:"label"});go.appendChild(img);go.appendChild(label);',
+  'var more=E("button",{class:"more",type:"button"});more.setAttribute("aria-haspopup","menu");more.setAttribute("aria-expanded","false");',
+  'var svg=document.createElementNS(SVG,"svg");',
+  'svg.setAttribute("viewBox","0 0 12 12");svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");',
+  'svg.setAttribute("stroke-width","1.6");svg.setAttribute("stroke-linecap","round");svg.setAttribute("stroke-linejoin","round");svg.setAttribute("aria-hidden","true");',
+  'var pth=document.createElementNS(SVG,"path");pth.setAttribute("d","M3 4.5 6 7.5l3-3");svg.appendChild(pth);more.appendChild(svg);',
+  'pill.appendChild(go);pill.appendChild(more);',
+  'var menu=E("div",{class:"menu",role:"menu"});',
+  '["download","hide","never","settings"].forEach(function(act,i){if(i===1||i===3)menu.appendChild(document.createElement("hr"));menu.appendChild(E("button",{role:"menuitem","data-act":act}));});',
+  'sh.appendChild(pill);sh.appendChild(menu);',
+  '}catch(e){}}}catch(e){}\n'
+].join('');
+function mdmPatchVideoJs(src) {
+  // Tangkap SELURUH statement (template literal + titik-koma) lalu ganti dengan
+  // pemanggilan builder DOM eksplisit (struktur node identik dengan template).
+  return src.replace(
+    /shadow\.innerHTML \+= (`(?:[^`\\]|\\.)*`);/,
+    '__mdmBuildShadowDOM(shadow);'
+  );
+}
+
 // Salin extension ke userData (folder asli di resources tak boleh diubah),
 // patch background.js (sendNativeMessage → bridge), lalu muat.
 async function startMdmExtension(bSession) {
@@ -353,7 +391,7 @@ async function bridgeSend(sent) {
       'try{console.log("[MDM-EXT] page.js aktif di", location.hostname)}catch(e){}\n' + pg, 'utf8');
     const vd = fs.readFileSync(path.join(patched, 'video.js'), 'utf8');
     fs.writeFileSync(path.join(patched, 'video.js'),
-      'try{console.log("[MDM-EXT] video.js aktif di", location.hostname)}catch(e){}\n' + vd, 'utf8');
+      'try{console.log("[MDM-EXT] video.js aktif di", location.hostname)}catch(e){}\n' + MDM_DOM_BUILDER + mdmPatchVideoJs(vd), 'utf8');
   } catch (e) {}
 
   try {
@@ -377,7 +415,7 @@ async function bridgeSend(sent) {
     for (const lang of ['id', 'en']) {
       try { loc = JSON.parse(fs.readFileSync(path.join(localesDir, lang, 'messages.json'), 'utf8')); break; } catch (e) {}
     }
-    const videoSrc = fs.readFileSync(path.join(extSrc, 'video.js'), 'utf8');
+    const videoSrc = mdmPatchVideoJs(fs.readFileSync(path.join(extSrc, 'video.js'), 'utf8'));
     const shim = `
 (() => {
   if (window.__mdmShimLoaded) return;
@@ -445,7 +483,7 @@ async function bridgeSend(sent) {
     window.cancelAnimationFrame = (tok) => { try { if (tok && typeof tok.cancel === 'function') tok.cancel(); else origCaf(tok); } catch (e) {} };
   } catch (e) {}
 })();`;
-    mdmShimJs = shim + '\ntry {\n' + videoSrc + '\n} catch (e) { console.log("[MDM-EXT] video.js error:", e && e.message); }';
+    mdmShimJs = shim + '\n' + MDM_DOM_BUILDER + '\ntry {\n' + videoSrc + '\n} catch (e) { console.log("[MDM-EXT] video.js error:", e && e.message); }';
     console.log('[mdm-ext] shim tombol video siap (' + mdmShimJs.length + ' bytes)');
   } catch (e) {
     mdmShimJs = '';

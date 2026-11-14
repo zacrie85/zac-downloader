@@ -629,10 +629,20 @@ function attachBrowserEvents(tab) {
   });
   // v1.6.1: inject shim + video.js MDM ke halaman → tombol "Download video"
   // muncul di atas video, klik-nya langsung masuk ke MDM via jembatan lokal.
+  // v1.6.3: verifikasi + injeksi ulang otomatis bila shim belum hidup (halaman
+  // berat/CSP dsb.) — injeksi idempotent: video.js early-return saat tombol
+  // masih alive, jadi aman dijalankan berulang.
   wv.addEventListener('dom-ready', async () => {
     try {
       const js = await api.mdmShim();
-      if (js) await wv.executeJavaScript(js, false);
+      if (!js) return;
+      try { await wv.executeJavaScript(js, false); } catch (e) {}
+      setTimeout(async () => {
+        try {
+          const ok = await wv.executeJavaScript('Boolean(globalThis.__mdmShimLoaded)', true);
+          if (!ok) await wv.executeJavaScript(js, false);
+        } catch (e) {}
+      }, 2500);
     } catch (e) {}
   });
 }
