@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.7-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.8-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,13 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.8 — FIX layar hitam mirror (video tak pernah terdekode)
+- **Gejala**: mirror "terhubung" (🟢) tetapi tab Android hanya menampilkan layar hitam — status `0 fps · 0 frame`.
+- **Penyebab 1 — framing berbeda**: server scrcpy asli mengirim `[4B size][1B type][payload]` (type 0 = config SPS/PPS, 1 = data, 2 = EOS), sedangkan renderer mengharapkan protokol internal `[12B sessionMeta][12B meta][Annex-B]`. Byte mentah dipipa langsung → parser renderer tidak pernah menemukan frame yang valid. Kini app **mengonversi framing scrcpy asli** (video DAN audio) ke protokol renderer, termasuk menyintesis sessionMeta dari dimensi SPS (parser H.264 exp-golomb lengkap: high-profile, scaling list, crop; rotasi layar = meta dikirim ulang).
+- **Penyebab 2 — chunk jatuh di celah listener**: kolektor socket memakai `once('data')` sehingga chunk setelah byte pertama (config + frame awal) bisa hilang di celah antara resolve koneksi dan pemasangan handler → decoder tak pernah terkonfigurasi, semua delta dibuang. Kini kolektor **persisten** (data tak mungkin hilang), dihentikan rapi setelah alur start selesai.
+- Backlog untuk client yang bergabung belakangan kini berformat protokol renderer (dahulu byte mentah scrcpy).
+- Tes baru: SPSTEST (parser SPS vs 6 resolusi nyata hasil ffmpeg/ffprobe — 6/6 persis) + STARTTEST mengirim framing scrcpy ASLI berisi H.264/Opus nyata dari `lib/fake-streams.json`.
 
 ### v1.6.7 — Mirror tahan server "bisu" (stall di socket kontrol)
 - **FIX "device tidak merespons (control)"**: video & audio sudah sukses tersambung, tetapi server scrcpy tidak pernah mengirim byte sambutan di socket kontrol (fork 5.0.1 pada Xiaomi/MIUI menggantung di tahap ini). Kini **socket kontrol cukup TCP-connect** — pesan kendali mengantre di kernel sampai server accept; mirror tidak lagi gagal di tahap ini.

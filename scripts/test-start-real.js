@@ -6,9 +6,11 @@
  * dari semua tes lama karena jalur fake session tidak pernah memanggil
  * start(). Tes ini menjalankan start() penuh dengan:
  *  - "adb" palsu (bash) yang mencatat setiap invokasi dan menjawab skenario
- *  - emulator server scrcpy (TCP) yang meniru handshake 3 socket:
- *      video [1B dummy][64B nama][4B codec h264] (+backlog frame)
- *      audio [1B dummy][4B opus | 4B disable]   (mode ok / noaudio)
+ *  - emulator server scrcpy (TCP) yang meniru handshake 3 socket DENGAN
+ *    framing scrcpy ASLI [4B size][1B type][payload] berisi SPS/PPS/GOP
+ *    H.264 + Opus asli dari lib/fake-streams.json (v1.6.8 menguji translator):
+ *      video [1B dummy][64B nama][4B codec h264] + config + data frames
+ *      audio [1B dummy][4B opus | 4B disable] + config + data frames
  *      control [1B dummy]
  *  - mode "crash": shell server langsung keluar + stderr → wajib gagal cepat
  *    dengan pesan yang memuat stderr HP (validasi fix fail-fast v1.6.5)
@@ -42,6 +44,7 @@ fs.writeFileSync(fakeJar, 'fake-jar\n');
 const adbLog = path.join(tmp, 'adb.log');
 const modeFile = path.join(tmp, 'mode');
 fs.writeFileSync(modeFile, 'ok');
+const FSTREAMS = path.join(__dirname, '..', 'lib', 'fake-streams.json'); // H264/Opus nyata
 
 // fake adb: catat invokasi; jawab sesuai skenario mode
 // pemetaan argumen: adb -s SER push|forward|shell|get-state → $1=-s $2=SER $3=subperintah
@@ -54,7 +57,7 @@ if [ "$3" = "push" ]; then echo "pushed"; exit 0; fi
 if [ "$3" = "forward" ]; then
   PORT="$4"; PORT="\${PORT#tcp:}"
   if [ "$MODE" != "crash" ]; then
-    setsid node "${fakeEmu}" "$PORT" "$MODE" >/dev/null 2>&1 &
+    setsid node "${fakeEmu}" "$PORT" "$MODE" "${FSTREAMS}" >/dev/null 2>&1 &
   fi
   exit 0
 fi
@@ -85,16 +88,34 @@ exit 0
 //             (simulasi server menggantung — watchdog v1.6.7)
 //  crash    : shell server langsung keluar (ditangani fake adb, bukan emu)
 fs.writeFileSync(fakeEmu, `const net = require('net');
+const fs = require('fs');
 const port = parseInt(process.argv[2], 10);
 const mode = process.argv[3] || 'ok';
 let n = 0;
+// v1.6.8: frame scrcpy ASLI [4B size][1B type][payload] dengan data H.264/Opus
+// nyata dari lib/fake-streams.json — menguji translator app-side
+let REAL = null;
+try {
+  const j = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
+  const SC = Buffer.from([0, 0, 0, 1]);
+  REAL = {
+    vcfg: { t: 0, d: Buffer.concat([SC, Buffer.from(j.sps, 'base64'), SC, Buffer.from(j.pps, 'base64')]) },
+    gop: (j.gop || []).slice(0, 3).map((g) => ({ t: 1, d: Buffer.concat([SC, Buffer.from(g.d, 'base64')]) })),
+    acfg: { t: 0, d: Buffer.from(j.opusHead, 'base64') },
+    aframes: (j.opusFrames || []).slice(0, 2).map((s) => ({ t: 1, d: Buffer.from(s, 'base64') }))
+  };
+} catch (e) {}
+function sendFrame(sock, f) {
+  const size = Buffer.alloc(4);
+  size.writeUInt32BE(f.d.length, 0);
+  sock.write(Buffer.concat([size, Buffer.from([f.t]), f.d]));
+}
 function videoFull(sock) {
   const name = Buffer.alloc(64);
   Buffer.from('Zac Test Device\\u0000', 'utf8').copy(name);
   sock.write(Buffer.concat([Buffer.from([0]), name, Buffer.from([0x68,0x32,0x36,0x34])]));
   if (mode === 'stall') return; // header saja — TIDAK ada data lanjutan
-  const meta = Buffer.alloc(12); meta[0] = 2; meta.writeUInt32BE(4, 8);
-  sock.write(Buffer.concat([meta, Buffer.from([0,0,0,1])])); // backlog frame
+  if (REAL) { sendFrame(sock, REAL.vcfg); for (const f of REAL.gop) sendFrame(sock, f); }
 }
 const srv = net.createServer((sock) => {
   n++;
@@ -109,6 +130,7 @@ const srv = net.createServer((sock) => {
   } else if (n === 2) { // audio: opus atau kode disable
     const code = mode === 'noaudio' ? Buffer.from([0,0,0,0]) : Buffer.from([0x6f,0x70,0x75,0x73]);
     sock.write(Buffer.concat([Buffer.from([0]), code]));
+    if (mode !== 'noaudio' && REAL) { sendFrame(sock, REAL.acfg); for (const f of REAL.aframes) sendFrame(sock, f); }
   } else { // control
     if (mode === 'noctl') return; // accept tapi bisu
     sock.write(Buffer.from([0]));
@@ -142,7 +164,7 @@ async function runCase(label, mode, opts, check) {
 
 (async () => {
   // 1) jalur sukses penuh — kalau ada TDZ/urutan deklarasi, crash di sini
-  await runCase('sukses + audio + stayAwake', 'ok', { audio: true, stayAwake: true, maxSize: 720 }, (r, logs, log, dt) => {
+  await runCase('sukses + audio + stayAwake', 'ok', { audio: true, stayAwake: true, maxSize: 720 }, (r, logs, log, dt, mgr) => {
     assert(r.ok === true, 'startSession ok (bukan crash TDZ)');
     assert(r.name === 'Zac Test Device', 'nama device dari header video: ' + r.name);
     assert(r.audio === true, 'audio aktif (opus)');
@@ -152,9 +174,13 @@ async function runCase(label, mode, opts, check) {
     assert(/stay_awake=false/.test(log), 'arg server memuat stay_awake=false');
     assert(/audio=auto/.test(log), 'arg server memuat audio=auto');
     assert(/max_size=720/.test(log), 'arg server memuat max_size=720');
-    assert(/getprop ro.product.brand/.test(log), 'getprop brand dipanggil');
-    assert(/svc power stayon true/.test(log), 'svc power stayon true dipanggil');
-    assert(dt < 20000, 'durasi ' + dt + 'ms (cepat, tidak menunggu deadline)');
+    assert(log.includes('getprop brand dipanggil') || log.includes('ro.product.brand'), 'getprop brand dipanggil');
+    assert(log.includes('svc power stayon true'), 'svc power stayon true dipanggil');
+    assert(dt < 15000, 'durasi ' + dt + 'ms (cepat, tidak menunggu deadline)');
+    // v1.6.8: translator framing scrcpy asli → protokol renderer
+    assert(logs.some((l) => /sessionMeta \d+x\d+ \(dari SPS\)/.test(l)), 'v1.6.8: sessionMeta dari SPS (translator video)');
+    assert(mgr.session && mgr.session.videoBacklog && (mgr.session.videoBacklog[0] & 0x80) === 0x80, 'backlog video diawali sessionMeta (protokol renderer)');
+    assert(mgr.session && mgr.session.audioBacklog && mgr.session.audioBacklog.length > 16, 'backlog audio terkonversi (meta + opus)');
   });
 
   // 2) audio tidak didukung → kode disable → mirror video saja

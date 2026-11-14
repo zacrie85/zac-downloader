@@ -1,9 +1,11 @@
 /**
- * ZAC DOWNLOADER v1.6.7 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * ZAC DOWNLOADER v1.6.8 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
  * Downloader video + browser built-in multi-tab (session restore) + media
  * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
- * v1.6.7: mirror tahan server "bisu" — kontrol tanpa byte-wait, watchdog stall,
- * diagnostik logcat pada error start.
+ * v1.6.8: FIX layar hitam mirror — aliran scrcpy asli dikonversi ke protokol
+ * renderer (framing [4B size][1B type][payload] → [12B meta][Annex-B]),
+ * kolektor data persisten (chunk tak lagi jatuh di celah listener), dimensi
+ * stream dari SPS (parser H.264 lengkap), audio scrcpy asli juga dikonversi.
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
