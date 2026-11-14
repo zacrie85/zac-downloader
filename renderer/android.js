@@ -422,6 +422,9 @@
         } else if (m.t === 'session' && m.state === 'running') {
           state.running = true;
           setStatus('🟢 ' + (m.name || state.name || 'terhubung'), 'on');
+        } else if (m.t === 'session' && m.state === 'stall') {
+          // v1.6.7: server HP hidup tapi tidak mengirim gambar (watchdog)
+          setStatus('⚠️ Server HP tidak mengirim gambar (' + (m.name || '?') + ') — tunggu ±10 detik; bila tetap kosong, tekan Pindai Ulang lalu Mulai Mirror lagi', 'err');
         }
       } catch (e) {}
     }, () => {

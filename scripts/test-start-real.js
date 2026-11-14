@@ -73,25 +73,49 @@ exit 0
 `, { mode: 0o755 });
 
 // emulator scrcpy: 3 koneksi berurutan video → audio → control
+// mode:
+//  ok       : normal (dummy+header+frame / opus / dummy)
+//  noaudio  : audio kirim kode disable
+//  noctl    : socket control DITERIMA tapi tidak pernah dikirim apa pun
+//             (simulasi server yang lambat accept / tanpa dummy — v1.6.7)
+//  two2sock : server hanya buka 2 socket (video, control) — koneksi ke-2
+//             client (audio) mengambil slot kontrol → slot asli kosong;
+//             mensimulasikan server yang menonaktifkan audio lebih awal
+//  stall    : handshake lengkap tapi TIDAK ADA data video setelahnya
+//             (simulasi server menggantung — watchdog v1.6.7)
+//  crash    : shell server langsung keluar (ditangani fake adb, bukan emu)
 fs.writeFileSync(fakeEmu, `const net = require('net');
 const port = parseInt(process.argv[2], 10);
 const mode = process.argv[3] || 'ok';
 let n = 0;
+function videoFull(sock) {
+  const name = Buffer.alloc(64);
+  Buffer.from('Zac Test Device\\u0000', 'utf8').copy(name);
+  sock.write(Buffer.concat([Buffer.from([0]), name, Buffer.from([0x68,0x32,0x36,0x34])]));
+  if (mode === 'stall') return; // header saja — TIDAK ada data lanjutan
+  const meta = Buffer.alloc(12); meta[0] = 2; meta.writeUInt32BE(4, 8);
+  sock.write(Buffer.concat([meta, Buffer.from([0,0,0,1])])); // backlog frame
+}
 const srv = net.createServer((sock) => {
   n++;
+  if (mode === 'two2sock') {
+    if (n === 1) videoFull(sock);
+    else if (n === 2) sock.write(Buffer.from([0])); // dummy slot kontrol
+    // koneksi ke-3 dst: diterima server, tidak pernah dikirim apa pun
+    return;
+  }
   if (n === 1) { // video
-    const name = Buffer.alloc(64);
-    Buffer.from('Zac Test Device\\u0000', 'utf8').copy(name);
-    sock.write(Buffer.concat([Buffer.from([0]), name, Buffer.from([0x68,0x32,0x36,0x34])]));
-    const meta = Buffer.alloc(12); meta[0] = 2; meta.writeUInt32BE(4, 8);
-    sock.write(Buffer.concat([meta, Buffer.from([0,0,0,1])])); // backlog frame
+    videoFull(sock);
   } else if (n === 2) { // audio: opus atau kode disable
     const code = mode === 'noaudio' ? Buffer.from([0,0,0,0]) : Buffer.from([0x6f,0x70,0x75,0x73]);
     sock.write(Buffer.concat([Buffer.from([0]), code]));
-  } else { sock.write(Buffer.from([0])); } // control
+  } else { // control
+    if (mode === 'noctl') return; // accept tapi bisu
+    sock.write(Buffer.from([0]));
+  }
 });
 srv.listen(port, '127.0.0.1');
-setTimeout(() => process.exit(0), 30000);
+setTimeout(() => process.exit(0), 40000);
 `);
 
 function readLog() { try { return fs.readFileSync(adbLog, 'utf8'); } catch (e) { return ''; } }
@@ -111,7 +135,7 @@ async function runCase(label, mode, opts, check) {
   const r = await mgr.startSession(Object.assign({ serial: 'TEST0001' }, opts));
   const dt = Date.now() - t0;
   if (!r.ok) console.log('  (info) error startSession: ' + String(r.error).slice(0, 120));
-  check(r, logs, readLog(), dt);
+  await check(r, logs, readLog(), dt, mgr);
   mgr.stopSession();
   await new Promise((res) => setTimeout(res, 300));
 }
@@ -147,6 +171,31 @@ async function runCase(label, mode, opts, check) {
     assert(r.error.includes('simulasi server crash'), 'pesan memuat stderr HP: ' + String(r.error).slice(0, 80));
     assert(dt < 15000, 'gagal cepat (' + dt + 'ms), bukan menunggu deadline penuh');
     assert(logs.some((l) => l.includes('server device keluar')), 'log: server device keluar');
+  });
+
+  // 4) server bisu di socket kontrol — v1.6.7: mirror tetap jalan
+  await runCase('socket kontrol bisu (tanpa dummy)', 'noctl', { audio: true, stayAwake: true }, (r, logs) => {
+    assert(r.ok === true, 'startSession ok meski kontrol tanpa byte sambutan');
+    assert(logs.some((l) => l.includes('tanpa byte sambutan')), 'log: lanjut tanpa byte kontrol');
+    assert(r.audio === true, 'audio tetap aktif');
+  });
+
+  // 5) server 2-socket (audio dimatikan lebih awal) → self-heal via retry tanpa audio
+  await runCase('server 2-socket → retry tanpa audio', 'two2sock', { audio: true }, (r, logs) => {
+    assert(r.ok === true, 'percobaan ke-2 sukses (audio=false)');
+    assert(r.audio === false, 'audio:false');
+    assert(logs.some((l) => l.includes('percobaan dengan audio gagal')), 'log: retry terpicu');
+    assert(logs.some((l) => l.includes('mirror jalan TANPA audio')), 'log: catatan fallback audio');
+  });
+
+  // 6) handshake lengkap tapi tidak ada data video → watchdog stall
+  await runCase('server menggantung → watchdog stall', 'stall', { audio: false, stallAfterMs: 1500 }, async (r, logs, log, dt, mgr) => {
+    assert(r.ok === true, 'startSession ok (server hidup)');
+    const msgs = [];
+    if (mgr.session) mgr.session.broadcastCtl = (o) => msgs.push(o);
+    await new Promise((res) => setTimeout(res, 2600));
+    assert(msgs.some((m) => m.t === 'session' && m.state === 'stall'), 'watchdog mengirim state stall');
+    assert(logs.some((l) => l.includes('WATCHDOG')), 'log: watchdog');
   });
 
   console.log(failures === 0 ? 'STARTTEST PASS (semua kasus lulus)' : 'STARTTEST GAGAL: ' + failures + ' asersi');

@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.6-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.7-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,13 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.7 — Mirror tahan server "bisu" (stall di socket kontrol)
+- **FIX "device tidak merespons (control)"**: video & audio sudah sukses tersambung, tetapi server scrcpy tidak pernah mengirim byte sambutan di socket kontrol (fork 5.0.1 pada Xiaomi/MIUI menggantung di tahap ini). Kini **socket kontrol cukup TCP-connect** — pesan kendali mengantre di kernel sampai server accept; mirror tidak lagi gagal di tahap ini.
+- **Watchdog stall**: bila server hidup tapi **tidak mengirim satu byte gambar pun dalam 25 detik**, tab Android menampilkan peringatan jelas ("Server HP tidak mengirim gambar — tunggu/Pindai Ulang") alih-alih layar kosong tanpa penjelasan.
+- **Diagnostik logcat**: saat start gagal, aplikasi mengambil jejak dari logcat HP (AndroidRuntime, Permission Denial, MediaCodec, AudioFlinger) dan menyertakannya di pesan error — server yang menggantung tidak menulis stderr, logcat satu-satunya petunjuk.
+- Deadline audio 8→15 detik; pesan error memuat serial device.
+- STARTTEST bertambah: 3 kasus baru (kontrol bisu, server 2-socket dengan self-heal retry, watchdog stall) — **6/6 lulus**.
 
 ### v1.6.6 — HOTFIX mirror: "Cannot access 'o' before initialization"
 - **v1.6.5 gagal start untuk SEMUA HP** dengan error `Cannot access 'o' before initialization` — kesalahan deklarasi (`o` dipakai sebelum dideklarasikan) di jalur mirror; v1.6.6 memperbaikinya.
