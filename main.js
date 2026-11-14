@@ -1,9 +1,9 @@
 /**
- * ZAC DOWNLOADER v1.6.4 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * ZAC DOWNLOADER v1.6.5 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
  * Downloader video + browser built-in multi-tab (session restore) + media
  * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
- * v1.6.4: mirror Android stabil di HP lama — audio=auto + fallback tanpa audio,
- * pesan error jelas (unauthorized/offline/error server HP), badge state device.
+ * v1.6.5: mirror stabil di Xiaomi/MIUI — cleanup=false + stay-awake via svc
+ * power (tanpa Settings provider), gagal cepat saat server HP mati.
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');

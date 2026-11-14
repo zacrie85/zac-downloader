@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.4-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.5-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,12 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.5 — Mirror stabil di Xiaomi/MIUI & HP dengan ROM ketat
+- **FIX "server di HP gagal: DatabaseUtils.readExceptionFromParcel → RemoteException" saat Mulai Mirror di Xiaomi/Redmi/POCO**: server scrcpy saat start menyentuh **Settings.Global** (`stay_on_while_plugged_in`, jalur `cleanup`/`stay_awake`); MIUI memblokir akses provider ini dari shell → server mati sebelum layar mirror terbentuk. Kini aplikasi mengirim **`cleanup=false`** + **`stay_awake=false`** ke server dan fitur **"Layar HP tetap menyala"** dipindah ke **`svc power stayon`** (PowerManagerService — tanpa Settings provider, aman di semua ROM), dipulihkan otomatis saat mirror dihentikan.
+- **Gagal cepat & diagnosa penuh**: bila server di HP mati saat start, aplikasi berhenti menunggu (tidak lagi menjalan timeout penuh) dan menampilkan **6 baris terakhir stderr HP apa adanya** (termasuk stack trace) supaya penyebab terlihat jelas.
+- **Deteksi MIUI**: bila brand HP Xiaomi/Redmi/POCO, aplikasi menyarankan mengaktifkan **"USB debugging (Setelan pengaman)"** agar sentuhan/kendali berfungsi (MIUI membatasi injeksi input).
+- Perbaikan v1.6.4 tetap: `audio=auto` + fallback tanpa audio (Android ≤10), badge state device, deadline video 25 detik.
 
 ### v1.6.4 — Mirror Android stabil di HP lama (audio otomatis)
 - **FIX "device tidak merespons" saat Mulai Mirror di HP Android ≤10**: akar masalahnya opsi **Audio HP → PC** — capture audio scrcpy hanya didukung **Android 11+**; di Android 10 ke bawah (mis. Oukitel K15 Plus) server scrcpy mati saat init audio → socket video tak pernah dibuka → timeout, padahal USB debugging & izin sudah benar. Kini aplikasi memakai **`audio=auto`** (HP tak mendukung → server kirim kode disable, mirror jalan video saja) + **fallback otomatis tanpa audio** bila percobaan pertama gagal.
