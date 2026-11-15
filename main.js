@@ -1,11 +1,10 @@
 /**
- * ZAC DOWNLOADER v1.6.8 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
+ * ZAC DOWNLOADER v1.6.9 (fork dari Klip Downloader v1.5.3 oleh zacrie85)
  * Downloader video + browser built-in multi-tab (session restore) + media
  * capture + MDM dibundel + mirror Android scrcpy (tab Android, tanpa emulator).
- * v1.6.8: FIX layar hitam mirror — aliran scrcpy asli dikonversi ke protokol
- * renderer (framing [4B size][1B type][payload] → [12B meta][Annex-B]),
- * kolektor data persisten (chunk tak lagi jatuh di celah listener), dimensi
- * stream dari SPS (parser H.264 lengkap), audio scrcpy asli juga dikonversi.
+ * v1.6.9: penguatan mirror — config avcC & frame tanpa config ditangani,
+ * decoder rescue dari SPS di frame data, garis diagnostik di status bar,
+ * log debug mirror ke file, tes pipeline penuh REAL-E2E (framing asli).
  */
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, session, dialog } = require('electron');
 const path = require('path');
@@ -609,10 +608,17 @@ if (!gotLock) {
         mirror = createMirrorServer({
           resolveAdb: () => process.env.KLIP_ADB || resolveBin(path.join('scrcpy', 'adb.exe'), path.join('scrcpy', 'adb'), 'adb'),
           resolveScrcpyBin: (...names) => resolveBin(...names),
-          serverJar: resolveBin(path.join('scrcpy', 'scrcpy-server')),
+          serverJar: process.env.KLIP_SERVER_JAR || resolveBin(path.join('scrcpy', 'scrcpy-server')),
           isSmoke: SMOKE,
           onLog: (l) => console.log(l)
         });
+        // v1.6.9: file log debug mirror + versi app (tampil di garis diagnostik
+        // tab Android) + mode KLIP_REAL_FAKE utk tes pipeline penuh
+        try {
+          mirror.debugPath = path.join(app.getPath('userData'), 'mirror-debug.log');
+          mirror.appVersion = app.getVersion();
+          mirror.realFake = process.env.KLIP_REAL_FAKE === '1';
+        } catch (e) {}
         await mirror.start();
         if (process.env.KLIP_FAKE_MIRROR === '1') {
           // smoke test: simulasi device scrcpy (stream H.264/Opus sintetis)

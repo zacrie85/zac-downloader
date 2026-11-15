@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.8-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.6.9-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -127,6 +127,14 @@ MIT © 2026 [zacrie85](https://github.com/zacrie85)
 Bundel **Mister Download Manager v0.5.2** di `bin/mdm/` berlisensi **GPL-3.0** © Ahmed Nefzaoui — [source code resmi](https://github.com/anefzaoui/misterdownloadmanager).
 
 ## 🗒 Changelog
+
+### v1.6.9 — Penguatan mirror + diagnostik layar
+- **Variasi fork ditangani**: config frame format **avcC** (length-prefixed) kini dikonversi ke Annex-B; bila server TIDAK mengirim config frame sama sekali, SPS/PPS yang muncul di frame data otomatis dipakai untuk membuka decoder (config sintetis).
+- **Rescue di renderer**: kalau config belum pernah sampai, renderer juga membuka decoder langsung dari SPS/PPS di frame data — video tak akan lagi "hitam diam-diam".
+- **Garis diagnostik di status bar**: versi aplikasi, status decoder, jumlah error dekode, dan **path file log** tampil langsung di tab Android — masalah bisa dilaporkan cukup dengan screenshot.
+- **Log debug mirror ke file**: semua peristiwa mirror (diagnosa hex aliran awal, detail frame pertama, sessionMeta, counter) ditulis ke `mirror-debug.log` di folder data aplikasi (`%APPDATA%\Zac Downloader\mirror-debug.log`).
+- **Tes baru REAL-E2E**: pipeline PENUH diuji end-to-end di Electron — framing scrcpy asli (H.264/Opus nyata hasil ffmpeg) → start() asli → translator → renderer WebCodecs → **frame terdekode + piksel tergambar di canvas** (dulu STARTTEST hanya menguji app-side dan MIRRORTEST memakai byte format renderer).
+- SPSTEST 6/6 · STARTTEST · TABTEST · MDMBTN · MIRRORTEST tetap hijau.
 
 ### v1.6.8 — FIX layar hitam mirror (video tak pernah terdekode)
 - **Gejala**: mirror "terhubung" (🟢) tetapi tab Android hanya menampilkan layar hitam — status `0 fps · 0 frame`.

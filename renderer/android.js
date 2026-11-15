@@ -109,7 +109,16 @@
       openDecoder(data);
       return;
     }
-    if (!state.decoder) return;
+    if (!state.decoder) {
+      // v1.6.9: cadangan — config belum pernah datang tetapi SPS/PPS ikut di
+      // frame data (varian fork tanpa config) → buka decoder dari frame ini
+      if (hasNalType(data, 7) && hasNalType(data, 8)) openDecoder(data);
+      if (!state.decoder) {
+        if (!(state.decHint % 60)) log('decoder belum terbuka — config frame belum diterima (' + (state.decHint || 0) + ' frame dibuang)');
+        state.decHint = (state.decHint || 0) + 1;
+        return;
+      }
+    }
     try {
       if (state.decoder.state === 'configured') {
         // setelah configure/error, decoder hanya bisa mulai dari keyframe
@@ -133,6 +142,16 @@
   }
 
   /* ---- konversi Annex-B → avc (length-prefixed) + pembuatan avcC ---- */
+  // cek cepat: payload Annex-B memuat NAL bertipe t (7=SPS, 8=PPS, 5=IDR)
+  function hasNalType(buf, t) {
+    for (let i = 0; i + 3 < buf.length; i++) {
+      if (buf[i] === 0 && buf[i + 1] === 0 && (buf[i + 2] === 1 || (buf[i + 2] === 0 && buf[i + 3] === 1))) {
+        const off = buf[i + 2] === 1 ? i + 3 : i + 4;
+        if (off < buf.length && (buf[off] & 0x1f) === t) return true;
+      }
+    }
+    return false;
+  }
   function splitAnnexb(buf) {
     const nals = [];
     let i = 0, start = -1;
@@ -197,6 +216,7 @@
         },
         error: (e) => {
           state.decodeErrors++;
+          state.decErr = e.message; // tampil di garis diagnostik status bar
           log('decoder error: ' + e.message);
           // pemulihan: konfigurasi ulang dan tunggu keyframe berikutnya
           try { state.decoder = null; } catch (e2) {}
@@ -440,6 +460,15 @@
       state.fps = state.fpsCount;
       state.fpsCount = 0;
       $('stFps').textContent = state.running ? (state.fps + ' fps · ' + state.framesDecoded + ' frame · ' + state.vw + '×' + state.vh) : '';
+      // v1.6.9: garis diagnostik — masalah decoder/config langsung terlihat
+      // di layar (laporan cukup dengan screenshot)
+      let diag = '';
+      if (state.appVersion) diag += 'v' + state.appVersion + ' · ';
+      if (state.running && !state.decoder) diag += 'decoder belum terbuka (config belum diterima) · ';
+      if (state.decErr) diag += 'decoder error: ' + state.decErr + ' · ';
+      if (state.decodeErrors) diag += 'err dekode ' + state.decodeErrors + ' · ';
+      if (state.debugPath) diag += 'log: ' + state.debugPath;
+      $('stDiag').textContent = diag.replace(/ · $/, '');
       if (smokeMode) fakeReport();
     }, 1000);
   }
@@ -571,6 +600,7 @@
       running: state.running, vw: state.vw, vh: state.vh,
       decoded: state.framesDecoded, fps: state.fps,
       audio: state.audioDecoded, decodeErrors: state.decodeErrors,
+      decErr: state.decErr || null, noDecoder: state.running && !state.decoder,
       name: state.name, pixelSum
     }));
     if (fakeReportCount === 1) {
@@ -592,6 +622,9 @@
       const r = await fetch(API + '/api/info');
       const j = await r.json();
       smokeMode = !!j.smoke;
+      // v1.6.9: versi aplikasi + path log debug → tampil di garis diagnostik
+      state.appVersion = j.appVersion || null;
+      state.debugPath = j.debugPath || null;
       if (j.running) {
         startStreams();
         return;
