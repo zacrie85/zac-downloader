@@ -32,9 +32,24 @@ fi
 echo "5/5 ChordKu.exe (terintegrasi: deteksi chord & kunci gitar) ..."
 # v1.7.0: ChordKu ditempel sepenuhnya ke Zac Downloader — exe resmi dari
 # rilis repo ChordKu, dipin ke versi tertentu (override: CHORDKU_VERSION).
-if have chordku/ChordKu.exe; then echo "   sudah ada, lewati"; else
-CK_VER="${CHORDKU_VERSION:-v1.0.8}"
-mkdir -p chordku
-curl -L --retry 3 -o chordku/ChordKu.exe \
-  "https://github.com/zacrie85/CARI-KUNCI-GITAR/releases/download/${CK_VER}/ChordKu.exe"
+# v1.7.1: curl -f (gagal saat 404 — jangan simpan halaman error sebagai
+# exe) + validasi ukuran: ChordKu.exe resmi ~95MB; <50MB = gagal build.
+CK_OK=0
+if have chordku/ChordKu.exe; then
+  echo "   sudah ada, lewati"
+  CK_OK=1
+else
+  CK_VER="${CHORDKU_VERSION:-v1.0.8}"
+  mkdir -p chordku
+  if curl -fL --retry 3 -o chordku/ChordKu.exe \
+    "https://github.com/zacrie85/CARI-KUNCI-GITAR/releases/download/${CK_VER}/ChordKu.exe"; then
+    CK_OK=1
+  fi
 fi
+if [ "$CK_OK" -ne 1 ] || [ "$(stat -c%s chordku/ChordKu.exe 2>/dev/null || echo 0)" -lt 50000000 ]; then
+  echo "   GAGAL: ChordKu.exe tidak valid/tidak terunduh (harusnya ~95MB)."
+  echo "   Pastikan rilis ${CHORDKU_VERSION:-v1.0.8} di repo CARI-KUNCI-GITAR sudah memuat asset ChordKu.exe."
+  exit 1
+fi
+echo "   ChordKu.exe OK ($(stat -c%s chordku/ChordKu.exe) byte)"
+
