@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.7.0-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.7.1-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
