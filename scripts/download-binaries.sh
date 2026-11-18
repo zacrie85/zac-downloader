@@ -39,7 +39,7 @@ if have chordku/ChordKu.exe; then
   echo "   sudah ada, lewati"
   CK_OK=1
 else
-  CK_VER="${CHORDKU_VERSION:-v1.0.8}"
+  CK_VER="${CHORDKU_VERSION:-v1.0.9}"
   mkdir -p chordku
   if curl -fL --retry 3 -o chordku/ChordKu.exe \
     "https://github.com/zacrie85/CARI-KUNCI-GITAR/releases/download/${CK_VER}/ChordKu.exe"; then

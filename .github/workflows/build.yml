@@ -28,7 +28,7 @@ jobs:
       - name: Unduh binari (yt-dlp, node, ffmpeg, ChordKu)
         run: bash scripts/download-binaries.sh
         env:
-          CHORDKU_VERSION: v1.0.8
+          CHORDKU_VERSION: v1.0.9
 
       - name: Build installer Windows
         run: npx electron-builder --win
