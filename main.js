@@ -14,6 +14,7 @@ const { spawn } = require('child_process');
 const { DownloadManager, MEDIA_EXTS } = require('./lib/downloader');
 const { createMediaTracker, isMediaContentType, shouldCapture } = require('./lib/mediacapture');
 const { createMirrorServer } = require('./lib/mirror');
+const bridge = require('./lib/bridge'); // v1.7.0: jembatan ChordKu
 
 // ---------- App flags ----------
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -632,6 +633,7 @@ if (!gotLock) {
     createWindow();
     registerIpc();
     registerSiteResolveIpc();
+    registerChordKuIpc(); // v1.7.0: jembatan ChordKu (deteksi chord)
   });
 
   app.on('before-quit', () => {
@@ -987,6 +989,64 @@ function safeOutName(title) {
   s = s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '');
   s = s.replace(/\s+/g, ' ').trim();
   return ((s.length > 90 ? s.slice(0, 90).trim() : s) || 'video-situs');
+}
+
+// ---------- v1.7.0: jembatan ChordKu (deteksi chord dari download-an) ----------
+function launchChordKu(bdir) {
+  const st = bridge.readStatus(bdir);
+  if (st.running) return { ok: true, already: true };
+  const exe = bridge.resolveChordKuExe({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    dirname: __dirname,
+    env: process.env
+  });
+  if (!exe) {
+    return { error: 'ChordKu.exe tidak ditemukan di paket (bin/chordku). Gunakan Zac Downloader v1.7.0 resmi atau letakkan ChordKu.exe di bin/chordku/.' };
+  }
+  try {
+    // detached: ChordKu tetap hidup walau Zac Downloader ditutup
+    const child = spawn(exe, [], { detached: true, stdio: 'ignore',
+                                   windowsHide: false, cwd: path.dirname(exe) });
+    child.on('error', () => {});
+    child.unref();
+    return { ok: true, spawned: true, exe };
+  } catch (e) {
+    return { error: 'Gagal menjalankan ChordKu: ' + e.message };
+  }
+}
+
+function registerChordKuIpc() {
+  const bdir = bridge.bridgeDir(process.env);
+  ipcMain.handle('chordku:status', () => {
+    const exe = bridge.resolveChordKuExe({
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      dirname: __dirname,
+      env: process.env
+    });
+    const st = bridge.readStatus(bdir);
+    return {
+      installed: !!exe,
+      exe: exe || '',
+      running: !!st.running,
+      version: st.version || '',
+      bridgeDir: bdir
+    };
+  });
+  ipcMain.handle('chordku:launch', () => launchChordKu(bdir));
+  ipcMain.handle('chordku:send', (e, payload = {}) => {
+    const msg = bridge.sendMessage(bdir, payload);
+    if (!msg) {
+      return { error: 'Pesan tidak valid — URL halaman / file kosong.' };
+    }
+    const lr = launchChordKu(bdir);
+    if (lr.error) {
+      // pesan sudah tersimpan: ChordKu memproses saat pertama kali jalan
+      return { ok: true, queued: true, launch: lr };
+    }
+    return { ok: true, mode: msg.mode };
+  });
 }
 
 function registerSiteResolveIpc() {

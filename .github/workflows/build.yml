@@ -1,0 +1,52 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instal dependensi
+        run: npm ci
+
+      - name: Patch NSIS (idempoten)
+        run: node scripts/patch-nsis-nodewine.js
+
+      - name: Unduh binari (yt-dlp, node, ffmpeg, ChordKu)
+        run: bash scripts/download-binaries.sh
+        env:
+          CHORDKU_VERSION: v1.0.7
+
+      - name: Build installer Windows
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Unggah artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zac-Downloader-Setup
+          path: dist/Zac-Downloader-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Rilis GitHub (saat push tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Zac-Downloader-Setup-*.exe
+          name: Zac Downloader ${{ github.ref_name }} — TERINTEGRASI CHORDKU
+          draft: false
+          prerelease: false

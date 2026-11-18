@@ -1,8 +1,8 @@
 {
   "name": "zac-downloader",
   "productName": "Zac Downloader",
-  "version": "1.6.9",
-  "description": "Zac Downloader - Download video dari YouTube, TikTok, Instagram, Facebook, Google Drive, BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort & ribuan situs lain. Dilengkapi browser built-in multi-tab + media capture + Mister Download Manager (MDM) dibundel. 100% lokal.",
+  "version": "1.7.0",
+  "description": "Zac Downloader - Download video dari YouTube, TikTok, Instagram, Facebook, Google Drive, BiliBili TV, Vidio, Dramaharian, FlickReels, Shortical, GoodShort & ribuan situs lain. Dilengkapi browser built-in multi-tab + media capture + Mister Download Manager (MDM) dibundel. Terintegrasi ChordKu (deteksi chord & kunci gitar dari hasil download). 100% lokal.",
   "main": "main.js",
   "author": "zacrie85",
   "license": "MIT",
@@ -18,7 +18,7 @@
   "build": {
     "appId": "io.github.zacrie85.zacdownloader",
     "productName": "Zac Downloader",
-    "copyright": "Copyright © 2026 zacrie85",
+    "copyright": "Copyright \u00a9 2026 zacrie85",
     "directories": {
       "output": "dist",
       "buildResources": "build"

@@ -28,3 +28,13 @@ echo "4/4 ekstrak ffmpeg.exe + ffprobe.exe ..."
 unzip -o -j /tmp/ffmpeg-win64.zip "*/bin/ffmpeg.exe" "*/bin/ffprobe.exe" -d .
 rm -f /tmp/ffmpeg-win64.zip
 fi
+
+echo "5/5 ChordKu.exe (terintegrasi: deteksi chord & kunci gitar) ..."
+# v1.7.0: ChordKu ditempel sepenuhnya ke Zac Downloader — exe resmi dari
+# rilis repo ChordKu, dipin ke versi tertentu (override: CHORDKU_VERSION).
+if have chordku/ChordKu.exe; then echo "   sudah ada, lewati"; else
+CK_VER="${CHORDKU_VERSION:-v1.0.7}"
+mkdir -p chordku
+curl -L --retry 3 -o chordku/ChordKu.exe \
+  "https://github.com/zacrie85/CARI-KUNCI-GITAR/releases/download/${CK_VER}/ChordKu.exe"
+fi

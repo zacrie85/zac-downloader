@@ -2,7 +2,7 @@
 
 **Downloader video + browser built-in multi-tab + MDM dibundel — 100% lokal, gratis, tanpa batas.**
 
-![Version](https://img.shields.io/badge/version-1.6.9-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-green) ![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue)
 
 > **Fork independen dari [Klip Downloader](https://github.com/zacrie85/klip-downloader) (MIT, © 2026 zacrie85)** — bisa dipasang berdampingan dengan Klip Downloader tanpa saling menimpa (appId, folder instalasi, shortcut, dan folder data semua berbeda).
 
@@ -14,6 +14,7 @@ Zac Downloader adalah aplikasi Windows untuk **mengunduh video** dari YouTube, T
 
 | Fitur | Keterangan |
 |---|---|
+| 🎸 **TERINTEGRASI CHORDKU** | **v1.7.0** — [ChordKu](https://github.com/zacrie85/CARI-KUNCI-GITAR) (deteksi chord & kunci gitar dari audio, transposisi, lirik otomatis) ditempel **sepenuhnya** ke dalam paket (`bin/chordku/ChordKu.exe`): tombol **🎸 ChordKu** di menu kiri membukanya, tombol **🎸 Kirim ke ChordKu** di bawah browser mengirim URL halaman → masuk **Unduhan Bawaan (yt-dlp)** ChordKu **dan** Browser YouTube tersematnya langsung dibuka, dan setiap MP3/MP4 di "Hasil Download" punya tombol **🎸** → langsung **deteksi chord otomatis**. Komunikasi via file JSON lokal (`%APPDATA%\ZacChordKuBridge`) — tanpa internet. Semua fitur Zac tidak ada yang berubah. |
 | 🤖 **TAB ANDROID — MIRROR & KENDALI HP** | **v1.6.2** — sambungkan HP Android via **USB** → layar HP tampil & bisa dikendalikan langsung di tab **🤖 Android** aplikasi (teknologi **scrcpy v5.0.1 resmi**, **tanpa emulator**). Cocok untuk SnackVideo dari HP aslimu: login & OTP tetap di HP, layar & suara tampil di PC. Ada tombol layar-mati 🌙 (HP bisa "istirahat" sambil mirror tetap jalan), navigasi Android, audio HP→PC, clipboard, dan opsi jendela scrcpy asli. |
 | 🔄 **SESSION RESTORE** | **v1.6.2** — semua tab (browser multi-tab dengan URL masing-masing, tab Android, sumber video, dll.) otomatis **dikembalikan persis** saat aplikasi dibuka lagi setelah ditutup — tidak ada tab yang hilang. |
 | 🎯 **TOMBOL "DOWNLOAD VIDEO" MDM DI BROWSER** | **v1.6.1** — gerakkan kursor ke atas video di browser aplikasi → tombol **"Download video"** MDM muncul → klik → video masuk ke **Mister Download Manager** (cookies login & referer ikut dibawa). Menu tombol: unduh, buka di aplikasi, sembunyikan di situs ini, buka opsi MDM. UI tombol berbahasa Indonesia. |

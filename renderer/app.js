@@ -4,10 +4,12 @@ const $ = (id) => document.getElementById(id);
 
 const el = {
   verBadge: $('verBadge'), verFoot: $('verFoot'), engineBadge: $('engineBadge'),
+  chordkuBadge: $('chordkuBadge'),
   urlInput: $('urlInput'), btnPaste: $('btnPaste'),
   btnDownload: $('btnDownload'), btnMp3: $('btnMp3'),
   qualitySel: $('qualitySel'), thumbChk: $('thumbChk'), parallelSel: $('parallelSel'),
   btnEngineUpdate: $('btnEngineUpdate'), btnMdm: $('btnMdm'),
+  btnChordku: $('btnChordku'), btnSendChordku: $('btnSendChordku'),
   btnAndroid: $('btnAndroid'),
   folderInfo: $('folderInfo'), btnPickFolder: $('btnPickFolder'), btnOpenFolder: $('btnOpenFolder'),
   queueLine: $('queueLine'), activeList: $('activeList'), logBox: $('logBox'),
@@ -487,6 +489,23 @@ function renderFiles(files) {
     });
 
     row.appendChild(ico); row.appendChild(info); row.appendChild(btn);
+
+    // v1.7.0: jalur file ke ChordKu — deteksi chord langsung berjalan
+    if (/\.(mp3|m4a|wav|flac|ogg|opus|aac|mp4|webm)$/i.test(f.name || '')) {
+      const ck = document.createElement('button');
+      ck.className = 'btn ghost small';
+      ck.textContent = '🎸 ChordKu';
+      ck.title = 'Kirim file ini ke ChordKu: masuk tab Deteksi + deteksi chord otomatis';
+      ck.addEventListener('click', async () => {
+        const r = await api.chordkuSend({ mode: 'file', path: f.path,
+          title: baseName(f.name), source: 'download' })
+          .catch((e) => ({ error: e && e.message }));
+        if (r && r.error) { toast('❌ ' + r.error, 'err', 6000); return; }
+        toast('🎸 File dikirim ke ChordKu — deteksi chord mulai di tab Deteksi 🎶', 'ok', 5000);
+        refreshChordkuBadge();
+      });
+      row.appendChild(ck);
+    }
     el.fileList.appendChild(row);
   }
 }
@@ -952,6 +971,53 @@ el.btnAndroid.addEventListener('click', () => {
   createTab(ANDROID_URL, true);
   toast('🤖 Tab Android dibuka — sambungkan HP-mu lewat USB', 'ok', 3200);
 });
+
+/* ---------------- v1.7.0: ChordKu (terintegrasi penuh) ---------------- */
+async function refreshChordkuBadge() {
+  if (!el.chordkuBadge || !api.chordkuStatus) return;
+  try {
+    const st = await api.chordkuStatus();
+    if (!st.installed) {
+      el.chordkuBadge.textContent = '🎸 ChordKu: tidak ada di paket';
+      el.chordkuBadge.title = 'ChordKu.exe tidak ditemukan di bin/chordku — paket ini mungkin bukan paket lengkap v1.7.0';
+      return;
+    }
+    if (st.running) {
+      el.chordkuBadge.textContent = '🎸 ChordKu: AKTIF' +
+        (st.version ? ' v' + String(st.version).replace(/^v/, '') : '');
+      el.chordkuBadge.title = 'ChordKu berjalan — kirim link/file lewat tombol 🎸';
+    } else {
+      el.chordkuBadge.textContent = '🎸 ChordKu: siap';
+      el.chordkuBadge.title = 'Klik tombol 🎸 ChordKu untuk membuka';
+    }
+  } catch (e) {}
+}
+
+el.btnChordku.addEventListener('click', async () => {
+  toast('🎸 Menjalankan ChordKu…');
+  const r = await api.chordkuLaunch().catch((e) => ({ error: e && e.message }));
+  if (r && r.error) { toast('❌ ' + r.error, 'err', 7000); return; }
+  toast(r.already
+    ? '🎸 ChordKu sudah berjalan — gunakan tombol 🎸 untuk kirim link/file'
+    : '🎸 ChordKu terbuka! File download-an → tombol 🎸 di daftar Hasil Download', 'ok', 5000);
+  refreshChordkuBadge();
+});
+
+el.btnSendChordku.addEventListener('click', async () => {
+  const w = curWb();
+  let u = '';
+  try { u = (w && w.getURL()) || ''; } catch (e) {}
+  if (!u || isNewTabUrl(u)) { toast('Belum ada halaman yang terbuka', 'warn'); return; }
+  toast('🎸 Mengirim URL ke ChordKu…');
+  const r = await api.chordkuSend({ mode: 'both', url: u, source: 'browser' })
+    .catch((e) => ({ error: e && e.message }));
+  if (r && r.error) { toast('❌ ' + r.error, 'err', 7000); return; }
+  toast('🎸 URL masuk Unduhan Bawaan ChordKu + Browser YouTube tersemat langsung dibuka 🚀', 'ok', 5200);
+  refreshChordkuBadge();
+});
+
+refreshChordkuBadge();
+setInterval(refreshChordkuBadge, 5000);
 
 /* ---------------- v1.6.2: session restore (tab terakhir kembali saat app dibuka) ---------------- */
 let sessionTimer = null;

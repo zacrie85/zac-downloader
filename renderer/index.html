@@ -17,6 +17,7 @@
         </div>
       </div>
     <div class="top-right">
+      <span class="engine-badge" id="chordkuBadge" title="Status ChordKu (terintegrasi)">🎸 ChordKu: memuat…</span>
       <span class="engine-badge" id="engineBadge" title="Versi engine yt-dlp">Engine: memuat…</span>
     </div>
   </header>
@@ -103,11 +104,12 @@
           <div id="fileList" class="file-list"></div>
         </div>
 
-        <div class="side-foot">
-          <button id="btnAndroid" class="btn ghost small" title="Mirror HP Android di tab ini (scrcpy, tanpa emulator) — SnackVideo &amp; aplikasi apa pun dengan login dari HP-mu sendiri">🤖 Android</button>
-          <button id="btnMdm" class="btn ghost small" title="Buka Mister Download Manager (MDM) yang dibundel — download file umum, torrent &amp; magnet link">⚡ Buka MDM</button>
-          <button id="btnEngineUpdate" class="btn ghost small" title="Update engine yt-dlp ke versi terbaru">🛠 Update Engine</button>
-        </div>
+      <div class="side-foot">
+        <button id="btnChordku" class="btn ghost small" title="Buka ChordKu (terintegrasi): deteksi chord dari file hasil download, transposisi kunci, lirik otomatis">🎸 ChordKu</button>
+        <button id="btnAndroid" class="btn ghost small" title="Mirror HP Android di tab ini (scrcpy, tanpa emulator) — SnackVideo &amp; aplikasi apa pun dengan login dari HP-mu sendiri">🤖 Android</button>
+        <button id="btnMdm" class="btn ghost small" title="Buka Mister Download Manager (MDM) yang dibundel — download file umum, torrent &amp; magnet link">⚡ Buka MDM</button>
+        <button id="btnEngineUpdate" class="btn ghost small" title="Update engine yt-dlp ke versi terbaru">🛠 Update Engine</button>
+      </div>
       </section>
 
       <footer class="foot">
@@ -140,6 +142,7 @@
 
       <div class="browser-actions">
         <button id="btnUseUrl" class="btn primary">⬇ Gunakan URL Halaman Ini untuk Download</button>
+        <button id="btnSendChordku" class="btn ghost" title="Kirim URL halaman ini ke ChordKu: masuk Unduhan Bawaan (yt-dlp) DAN Browser YouTube tersemat ChordKu">🎸 Kirim ke ChordKu</button>
         <span id="detectChip" class="chip hidden">🎯 Video terdeteksi — URL otomatis terisi ke menu kiri!</span>
         <span class="tip-inline">💡 Dramaharian: URL drama → semua episode gratis otomatis. GoodShort &amp; Vidio: buka videonya di browser ini → chip 📺 muncul → klik untuk unduh (premium Vidio: login dulu di browser ini). BiliBili TV: URL drama → semua episode otomatis. Situs lain (FlickReels/Shortical): tekan Play di browser ini — video terdeteksi ke menu kiri. SnackVideo &amp; aplikasi HP lain: tombol 🤖 Android (mirror HP asli, login tetap di HP-mu).</span>
       </div>

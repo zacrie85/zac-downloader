@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('klip', {
   sessionLoad: () => ipcRenderer.invoke('session:load'),
   // v1.6.2: mirror Android (scrcpy) — info server lokal untuk tab Android
   mirrorInfo: () => ipcRenderer.invoke('mirror:info'),
+  // v1.7.0: jembatan ChordKu — status / buka / kirim URL & file
+  chordkuStatus: () => ipcRenderer.invoke('chordku:status'),
+  chordkuLaunch: () => ipcRenderer.invoke('chordku:launch'),
+  chordkuSend: (payload) => ipcRenderer.invoke('chordku:send', payload),
   onEvent: (cb) => {
     const h = (e, d) => { try { cb(d); } catch (err) { console.error('event handler', err); } };
     ipcRenderer.on('download:event', h);

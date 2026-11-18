@@ -1,5 +1,5 @@
 ====================================================
- ZAC DOWNLOADER v1.6.2 (mirror Android + session restore)
+ ZAC DOWNLOADER v1.7.0 (mirror Android + session restore)
  Petunjuk Pemakaian
 ====================================================
 
@@ -13,6 +13,24 @@ saling menimpa:
   - Shortcut         : "Zac Downloader" (desktop & Start Menu)
   - Data/setting     : %APPDATA%\Zac Downloader
   - Folder download  : Videos\Zac Downloader (bisa diganti)
+
+APA YANG BARU DI V1.7.0
+-----------------------
+0) TERINTEGRASI CHORDKU 🎸 — DETEKSI CHORD DARI HASIL DOWNLOAD
+   - ChordKu (aplikasi CARI KUNCI GITAR) sekarang ditempel penuh ke
+     dalam paket (bin/chordku/ChordKu.exe). Semua fitur Zac tetap.
+   - Tombol [🎸 ChordKu] di menu kiri → membuka ChordKu (deteksi
+     chord dari audio, transposisi kunci, lirik otomatis, dsb).
+   - Tombol [🎸 Kirim ke ChordKu] di bawah browser → URL halaman
+     yang sedang terbuka masuk ke kolom "URL YouTube" (Unduhan
+     Bawaan yt-dlp) ChordKU DAN Browser YouTube tersemat ChordKu
+     langsung dibuka di video itu.
+   - Setiap file MP3/MP4 di daftar "Hasil Download" punya tombol
+     [🎸 ChordKu] → file langsung masuk tab Deteksi ChordKu dan
+     deteksi chord otomatis berjalan sampai akhir lagu.
+   - Status koneksi tampil di pojok kanan atas: "ChordKu: AKTIF".
+   - Komunikasi lewat file JSON lokal (%APPDATA%\ZacChordKuBridge)
+     — tanpa internet, tanpa port.
 
 APA YANG BARU DI V1.6.2
 -----------------------
